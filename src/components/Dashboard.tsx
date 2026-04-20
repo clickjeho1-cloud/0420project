@@ -153,6 +153,20 @@ export function Dashboard() {
           <span className="text-slate-200">{effectiveSupabaseAnon ? "OK" : "없음"}</span>
         </li>
       </ul>
+      <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-slate-500 md:grid-cols-2">
+        <div className="truncate">
+          MQTT raw: <span className="font-mono">{effectiveMqttWsUrl || "(빈값)"}</span>
+        </div>
+        <div className="truncate">
+          MQTT normalized: <span className="font-mono">{wsUrl || "(정규화 실패)"}</span>
+        </div>
+        <div>
+          MQTT user/pass 길이:{" "}
+          <span className="font-mono">
+            {user.length}/{pass.length}
+          </span>
+        </div>
+      </div>
       {hasAnyMissing ? (
         <p className="mt-2 text-xs text-amber-200/90">
           누락: <span className="font-mono">{[...missingMqttKeys, ...missingSupabaseKeys].join(", ")}</span>
@@ -386,7 +400,7 @@ export function Dashboard() {
   );
 
   useEffect(() => {
-    if (!wsUrl || !user || !pass) {
+    if (!effectiveMqttWsUrl || !user || !pass || !wsUrl) {
       setMqttStatus("설정없음");
       setMqttReady(false);
       setMqttError(null);
@@ -395,6 +409,15 @@ export function Dashboard() {
 
     let cancelled = false;
     setMqttError(null);
+    setMqttStatus("연결 중");
+    setMqttReady(false);
+
+    const timeout = window.setTimeout(() => {
+      if (cancelled) return;
+      setMqttStatus("끊김");
+      setMqttReady(false);
+      setMqttError("연결 시간 초과(8초) — WebSocket URL/포트/경로(/mqtt) 및 계정 권한을 확인하세요.");
+    }, 8000);
 
     void import("mqtt")
       .then(({ connect }) => {
@@ -411,6 +434,7 @@ export function Dashboard() {
 
         client.on("connect", () => {
           if (cancelled) return;
+          window.clearTimeout(timeout);
           setMqttStatus("연결됨");
           setMqttReady(true);
           setMqttError(null);
@@ -429,6 +453,7 @@ export function Dashboard() {
         });
         client.on("error", (e) => {
           console.error("MQTT", e);
+          window.clearTimeout(timeout);
           setMqttStatus("끊김");
           setMqttReady(false);
           setMqttError(String((e as any)?.message || e));
@@ -449,6 +474,7 @@ export function Dashboard() {
       })
       .catch((e) => {
         if (cancelled) return;
+        window.clearTimeout(timeout);
         setMqttStatus("끊김");
         setMqttReady(false);
         setMqttError(`mqtt 모듈 로드 실패: ${String((e as any)?.message || e)}`);
@@ -456,6 +482,7 @@ export function Dashboard() {
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
       setMqttReady(false);
       if (clientRef.current) {
         try {
@@ -466,7 +493,7 @@ export function Dashboard() {
         clientRef.current = null;
       }
     };
-  }, [wsUrl, user, pass]);
+  }, [effectiveMqttWsUrl, wsUrl, user, pass]);
 
   useEffect(() => {
     if (temp != null && humi != null) {
