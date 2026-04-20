@@ -95,7 +95,8 @@ export function Dashboard() {
   const effectiveMqttUser = (override?.mqttUser || env?.mqtt?.user || "").trim();
   const effectiveMqttPassword = (override?.mqttPassword || env?.mqtt?.password || "").trim();
   const effectiveSupabaseUrl = (override?.supabaseUrl || env?.supabase?.url || "").trim();
-  const effectiveSupabaseAnon = (override?.supabaseAnonKey || env?.supabase?.anonKey || "").trim();
+  const effectiveSupabaseAnonRaw = (override?.supabaseAnonKey || env?.supabase?.anonKey || "").trim();
+  const effectiveSupabaseAnon = effectiveSupabaseAnonRaw.replace(/\s+/g, "");
 
   const wsUrl = useMemo(() => normalizeMqttWsUrl(effectiveMqttWsUrl), [effectiveMqttWsUrl]);
   const user = effectiveMqttUser;
@@ -395,54 +396,63 @@ export function Dashboard() {
     let cancelled = false;
     setMqttError(null);
 
-    void import("mqtt").then(({ connect }) => {
-      if (cancelled) return;
-
-      const client = connect(wsUrl, {
-        username: user,
-        password: pass,
-        clientId: `web-${Math.random().toString(16).slice(2, 10)}`,
-        reconnectPeriod: 4000,
-      });
-
-      clientRef.current = client;
-
-      client.on("connect", () => {
+    void import("mqtt")
+      .then(({ connect }) => {
         if (cancelled) return;
-        setMqttStatus("연결됨");
-        setMqttReady(true);
-        setMqttError(null);
-        client.subscribe([MQTT_TOPIC_TEMP, MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS], (err) => {
-          if (err) console.error(err);
-        });
-      });
 
-      client.on("reconnect", () => {
-        setMqttStatus("연결 중");
-        setMqttReady(false);
-      });
-      client.on("offline", () => {
+        const client = connect(wsUrl, {
+          username: user,
+          password: pass,
+          clientId: `web-${Math.random().toString(16).slice(2, 10)}`,
+          reconnectPeriod: 4000,
+        });
+
+        clientRef.current = client;
+
+        client.on("connect", () => {
+          if (cancelled) return;
+          setMqttStatus("연결됨");
+          setMqttReady(true);
+          setMqttError(null);
+          client.subscribe([MQTT_TOPIC_TEMP, MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS], (err) => {
+            if (err) console.error(err);
+          });
+        });
+
+        client.on("reconnect", () => {
+          setMqttStatus("연결 중");
+          setMqttReady(false);
+        });
+        client.on("offline", () => {
+          setMqttStatus("끊김");
+          setMqttReady(false);
+        });
+        client.on("error", (e) => {
+          console.error("MQTT", e);
+          setMqttStatus("끊김");
+          setMqttReady(false);
+          setMqttError(String((e as any)?.message || e));
+        });
+
+        client.on("message", (topic, payload) => {
+          const msg = payload.toString();
+          if (topic === MQTT_TOPIC_TEMP) {
+            const v = parseFloat(msg);
+            if (!Number.isNaN(v)) setTemp(v);
+          } else if (topic === MQTT_TOPIC_HUMI) {
+            const v = parseFloat(msg);
+            if (!Number.isNaN(v)) setHumi(v);
+          } else if (topic === MQTT_TOPIC_STATUS) {
+            setLastStatus(msg);
+          }
+        });
+      })
+      .catch((e) => {
+        if (cancelled) return;
         setMqttStatus("끊김");
         setMqttReady(false);
+        setMqttError(`mqtt 모듈 로드 실패: ${String((e as any)?.message || e)}`);
       });
-      client.on("error", (e) => {
-        console.error("MQTT", e);
-        setMqttError(String((e as any)?.message || e));
-      });
-
-      client.on("message", (topic, payload) => {
-        const msg = payload.toString();
-        if (topic === MQTT_TOPIC_TEMP) {
-          const v = parseFloat(msg);
-          if (!Number.isNaN(v)) setTemp(v);
-        } else if (topic === MQTT_TOPIC_HUMI) {
-          const v = parseFloat(msg);
-          if (!Number.isNaN(v)) setHumi(v);
-        } else if (topic === MQTT_TOPIC_STATUS) {
-          setLastStatus(msg);
-        }
-      });
-    });
 
     return () => {
       cancelled = true;
