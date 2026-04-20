@@ -65,12 +65,17 @@ export function Dashboard() {
     let cancelled = false;
     setPublicEnvError(null);
 
-    fetch("/api/public-env", { cache: "no-store" })
+    const url = new URL("/api/public-env", window.location.origin).toString();
+    fetch(url, { cache: "no-store" })
       .then(async (r) => {
-        const json = (await r.json()) as any;
-        if (!r.ok || !json?.ok) {
-          throw new Error(json?.error || `public-env 실패 (${r.status})`);
+        const ct = r.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) {
+          const text = await r.text();
+          const head = text.slice(0, 120).replace(/\s+/g, " ");
+          throw new Error(`public-env 응답이 JSON이 아닙니다 (${r.status}) - ${head}`);
         }
+        const json = (await r.json()) as any;
+        if (!r.ok || !json?.ok) throw new Error(json?.error || `public-env 실패 (${r.status})`);
         if (cancelled) return;
         setEnv(json);
       })
