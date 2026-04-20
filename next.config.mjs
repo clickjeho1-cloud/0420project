@@ -13,6 +13,13 @@ const nextConfig = {
         net: false,
         tls: false,
         child_process: false,
+        // mqtt 브라우저 번들이 참조하는 Node core 모듈 폴리필
+        buffer: "buffer/",
+        process: "process/browser",
+        stream: "stream-browserify",
+        util: "util/",
+        assert: "assert/",
+        events: "events/",
       };
 
       config.resolve.alias = {
