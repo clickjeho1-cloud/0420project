@@ -33,8 +33,23 @@ export function normalizeMqttWsUrl(raw: string | undefined): string | undefined 
   } else if (t.startsWith("http://")) {
     t = `ws://${t.slice("http://".length)}`;
   }
-  if (t.startsWith("wss://") || t.startsWith("ws://")) {
-    return t;
+  if (!(t.startsWith("wss://") || t.startsWith("ws://"))) {
+    t = `wss://${t}`;
   }
-  return `wss://${t}`;
+
+  // HiveMQ Cloud WebSocket는 보통 /mqtt 경로를 사용함.
+  // 사용자가 호스트/포트만 입력한 경우(또는 / 만 있는 경우) /mqtt를 자동 보정.
+  try {
+    const u = new URL(t);
+    const host = u.hostname.toLowerCase();
+    const path = u.pathname || "/";
+    if (host.endsWith("hivemq.cloud") && (path === "/" || path === "")) {
+      u.pathname = "/mqtt";
+      return u.toString();
+    }
+  } catch {
+    // URL 파싱 실패 시 원본 유지
+  }
+
+  return t;
 }

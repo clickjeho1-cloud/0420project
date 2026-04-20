@@ -21,6 +21,7 @@ export function Dashboard() {
     "연결 중"
   );
   const [mqttReady, setMqttReady] = useState(false);
+  const [mqttError, setMqttError] = useState<string | null>(null);
   const [temp, setTemp] = useState<number | null>(null);
   const [humi, setHumi] = useState<number | null>(null);
   const [lastStatus, setLastStatus] = useState<string>("—");
@@ -346,10 +347,12 @@ export function Dashboard() {
     if (!wsUrl || !user || !pass) {
       setMqttStatus("설정없음");
       setMqttReady(false);
+      setMqttError(null);
       return;
     }
 
     let cancelled = false;
+    setMqttError(null);
 
     void import("mqtt").then(({ connect }) => {
       if (cancelled) return;
@@ -367,6 +370,7 @@ export function Dashboard() {
         if (cancelled) return;
         setMqttStatus("연결됨");
         setMqttReady(true);
+        setMqttError(null);
         client.subscribe([MQTT_TOPIC_TEMP, MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS], (err) => {
           if (err) console.error(err);
         });
@@ -380,7 +384,10 @@ export function Dashboard() {
         setMqttStatus("끊김");
         setMqttReady(false);
       });
-      client.on("error", (e) => console.error("MQTT", e));
+      client.on("error", (e) => {
+        console.error("MQTT", e);
+        setMqttError(String((e as any)?.message || e));
+      });
 
       client.on("message", (topic, payload) => {
         const msg = payload.toString();
@@ -434,6 +441,15 @@ export function Dashboard() {
     <div className="space-y-6">
       {envHint}
       {overridePanel}
+      {wsUrl && /:8883(\/|$)/.test(wsUrl) ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
+          <p className="font-medium text-amber-200">MQTT WebSocket 포트 확인</p>
+          <p className="mt-2 text-amber-100/90">
+            현재 URL에 <code className="rounded bg-slate-800 px-1">:8883</code> 이 보입니다. 아두이노(TLS)는 8883이지만,
+            웹 대시보드는 보통 <code className="rounded bg-slate-800 px-1">wss://...:8884/mqtt</code> (WebSocket) 를 사용합니다.
+          </p>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700/60 bg-panel px-4 py-3 text-sm">
         <div>
           <span className="text-slate-400">MQTT </span>
@@ -456,15 +472,31 @@ export function Dashboard() {
           </span>
         </div>
       </div>
+      {mqttError ? (
+        <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 px-4 py-3 text-sm text-rose-100">
+          <p className="font-medium text-rose-200">MQTT 오류</p>
+          <p className="mt-2 text-rose-100/90">{mqttError}</p>
+          <p className="mt-2 text-xs text-rose-200/80">
+            연결 URL: <code className="rounded bg-slate-800 px-1">{wsUrl}</code>
+          </p>
+        </div>
+      ) : null}
       {supabaseError ? (
         <div className="rounded-xl border border-rose-500/30 bg-rose-950/20 px-4 py-3 text-sm text-rose-100">
           <p className="font-medium text-rose-200">Supabase 오류</p>
           <p className="mt-2 text-rose-100/90">
             {supabaseError}
           </p>
-          <p className="mt-2 text-xs text-rose-200/80">
-            테이블이 없으면 Supabase SQL Editor에서 <code className="rounded bg-slate-800 px-1">supabase/schema.sql</code> 을 1회 실행해야 합니다.
-          </p>
+          {supabaseError.toLowerCase().includes("invalid api key") ? (
+            <p className="mt-2 text-xs text-rose-200/80">
+              <b>API 키가 잘못되었습니다.</b> Supabase Settings → API 의 <code className="rounded bg-slate-800 px-1">anon public</code>{" "}
+              키를 그대로 복사해 넣었는지(앞뒤 공백/따옴표 포함 여부)와 <code className="rounded bg-slate-800 px-1">Supabase URL</code> 이 프로젝트와 일치하는지 확인하세요.
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-rose-200/80">
+              테이블이 없으면 Supabase SQL Editor에서 <code className="rounded bg-slate-800 px-1">supabase/schema.sql</code> 을 1회 실행해야 합니다.
+            </p>
+          )}
         </div>
       ) : null}
 
