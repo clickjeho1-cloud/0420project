@@ -1,8 +1,7 @@
 "use client";
 
 import type { MqttClient } from "mqtt";
-
-const TOPIC_CONTROL = "smartfarm/control";
+import { MQTT_TOPIC_CONTROL } from "@/lib/mqtt-topics";
 
 type Props = {
   disabled: boolean;
@@ -13,7 +12,7 @@ export function PumpLedControls({ disabled, getClient }: Props) {
   const send = (payload: string) => {
     const c = getClient();
     if (!c?.connected) return;
-    c.publish(TOPIC_CONTROL, payload, { qos: 0 });
+    c.publish(MQTT_TOPIC_CONTROL, payload, { qos: 0 });
   };
 
   const btn =
@@ -23,7 +22,7 @@ export function PumpLedControls({ disabled, getClient }: Props) {
     <div className="rounded-xl border border-slate-700/60 bg-panel p-4 shadow-lg backdrop-blur">
       <h2 className="mb-4 text-lg font-medium text-white">원격 제어 (MQTT 발행)</h2>
       <p className="mb-4 text-xs text-slate-500">
-        토픽 <code className="text-slate-400">{TOPIC_CONTROL}</code> — 아두이노 스케치와 동일한
+        토픽 <code className="text-slate-400">{MQTT_TOPIC_CONTROL}</code> — 아두이노 스케치와 동일한
         명령 문자열
       </p>
 

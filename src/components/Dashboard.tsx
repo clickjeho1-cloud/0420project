@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MqttClient } from "mqtt";
 import { getSupabaseBrowser } from "@/lib/supabase-client";
 import type { SensorRow } from "@/lib/types";
+import {
+  MQTT_TOPIC_HUMI,
+  MQTT_TOPIC_STATUS,
+  MQTT_TOPIC_TEMP,
+} from "@/lib/mqtt-topics";
 import { PumpLedControls } from "./PumpLedControls";
 import { SensorCharts } from "./SensorCharts";
 import { StatusCards } from "./StatusCards";
-
-const TOPIC_TEMP = "smartfarm/sensor/temp";
-const TOPIC_HUMI = "smartfarm/sensor/humi";
-const TOPIC_STATUS = "smartfarm/status";
 
 export function Dashboard() {
   const [mqttStatus, setMqttStatus] = useState<"연결 중" | "연결됨" | "끊김" | "설정없음">(
@@ -106,7 +107,7 @@ export function Dashboard() {
         if (cancelled) return;
         setMqttStatus("연결됨");
         setMqttReady(true);
-        client.subscribe([TOPIC_TEMP, TOPIC_HUMI, TOPIC_STATUS], (err) => {
+        client.subscribe([MQTT_TOPIC_TEMP, MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS], (err) => {
           if (err) console.error(err);
         });
       });
@@ -123,13 +124,13 @@ export function Dashboard() {
 
       client.on("message", (topic, payload) => {
         const msg = payload.toString();
-        if (topic === TOPIC_TEMP) {
+        if (topic === MQTT_TOPIC_TEMP) {
           const v = parseFloat(msg);
           if (!Number.isNaN(v)) setTemp(v);
-        } else if (topic === TOPIC_HUMI) {
+        } else if (topic === MQTT_TOPIC_HUMI) {
           const v = parseFloat(msg);
           if (!Number.isNaN(v)) setHumi(v);
-        } else if (topic === TOPIC_STATUS) {
+        } else if (topic === MQTT_TOPIC_STATUS) {
           setLastStatus(msg);
         }
       });

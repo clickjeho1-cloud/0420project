@@ -2,6 +2,8 @@
 
 Arduino UNO R4 WiFi → **HiveMQ MQTT** → (본 웹앱) **Supabase** 저장 + **Vercel** 배포.
 
+- GitHub: [https://github.com/clickjeho1-cloud/0420project](https://github.com/clickjeho1-cloud/0420project)
+
 ## 디렉터리 구조
 
 ```
@@ -16,7 +18,7 @@ Arduino UNO R4 WiFi → **HiveMQ MQTT** → (본 웹앱) **Supabase** 저장 + *
 ├── .env.example
 ├── .gitignore
 ├── README.md
-├── public/                    # 정적 파일 (현재 .gitkeep)
+├── public/                    # 정적 파일 (robots.txt 등)
 ├── supabase/
 │   └── schema.sql             # Supabase 테이블·RLS (초기 1회 실행)
 └── src/
@@ -36,6 +38,7 @@ Arduino UNO R4 WiFi → **HiveMQ MQTT** → (본 웹앱) **Supabase** 저장 + *
     │   ├── SensorCharts.tsx
     │   └── PumpLedControls.tsx
     └── lib/
+        ├── mqtt-topics.ts       # MQTT 토픽 문자열 (아두이노와 동일)
         ├── supabase-client.ts
         └── types.ts
 ```
@@ -79,7 +82,7 @@ git init
 git add .
 git commit -m "Initial commit: smartfarm dashboard"
 # GitHub 에 저장소 만든 뒤
-git remote add origin https://github.com/<계정>/<저장소>.git
+git remote add origin https://github.com/clickjeho1-cloud/0420project.git
 git branch -M main
 git push -u origin main
 ```
