@@ -33,9 +33,33 @@ export function Dashboard() {
     mqtt: { wsUrl: string; user: string; password: string; missingKeys: string[] };
     supabase: { url: string; anonKey: string; missingKeys: string[] };
   } | null>(null);
+  const [override, setOverride] = useState<{
+    mqttWsUrl: string;
+    mqttUser: string;
+    mqttPassword: string;
+    supabaseUrl: string;
+    supabaseAnonKey: string;
+  } | null>(null);
 
   const clientRef = useRef<MqttClient | null>(null);
   const lastSaveRef = useRef(0);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("smartfarm_env_override_v1");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as any;
+      setOverride({
+        mqttWsUrl: String(parsed?.mqttWsUrl || ""),
+        mqttUser: String(parsed?.mqttUser || ""),
+        mqttPassword: String(parsed?.mqttPassword || ""),
+        supabaseUrl: String(parsed?.supabaseUrl || ""),
+        supabaseAnonKey: String(parsed?.supabaseAnonKey || ""),
+      });
+    } catch {
+      // 무시 (깨진 저장값)
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,11 +85,174 @@ export function Dashboard() {
     };
   }, []);
 
-  const wsUrl = useMemo(() => normalizeMqttWsUrl(env?.mqtt?.wsUrl), [env]);
-  const user = env?.mqtt?.user?.trim() || "";
-  const pass = env?.mqtt?.password?.trim() || "";
-  const missingMqttKeys = env?.mqtt?.missingKeys ?? [];
-  const missingSupabaseKeys = env?.supabase?.missingKeys ?? [];
+  const effectiveMqttWsUrl = (override?.mqttWsUrl || env?.mqtt?.wsUrl || "").trim();
+  const effectiveMqttUser = (override?.mqttUser || env?.mqtt?.user || "").trim();
+  const effectiveMqttPassword = (override?.mqttPassword || env?.mqtt?.password || "").trim();
+  const effectiveSupabaseUrl = (override?.supabaseUrl || env?.supabase?.url || "").trim();
+  const effectiveSupabaseAnon = (override?.supabaseAnonKey || env?.supabase?.anonKey || "").trim();
+
+  const wsUrl = useMemo(() => normalizeMqttWsUrl(effectiveMqttWsUrl), [effectiveMqttWsUrl]);
+  const user = effectiveMqttUser;
+  const pass = effectiveMqttPassword;
+
+  const missingMqttKeys =
+    !effectiveMqttWsUrl || !effectiveMqttUser || !effectiveMqttPassword
+      ? [
+          ...(!effectiveMqttWsUrl ? ["NEXT_PUBLIC_MQTT_WS_URL"] : []),
+          ...(!effectiveMqttUser ? ["NEXT_PUBLIC_MQTT_USER"] : []),
+          ...(!effectiveMqttPassword ? ["NEXT_PUBLIC_MQTT_PASSWORD"] : []),
+        ]
+      : [];
+  const missingSupabaseKeys =
+    !effectiveSupabaseUrl || !effectiveSupabaseAnon
+      ? [
+          ...(!effectiveSupabaseUrl ? ["NEXT_PUBLIC_SUPABASE_URL"] : []),
+          ...(!effectiveSupabaseAnon ? ["NEXT_PUBLIC_SUPABASE_ANON_KEY"] : []),
+        ]
+      : [];
+
+  const hasAnyMissing = missingMqttKeys.length > 0 || missingSupabaseKeys.length > 0;
+
+  const overridePanel = hasAnyMissing ? (
+    <div className="rounded-xl border border-slate-700/60 bg-panel px-4 py-4 text-sm">
+      <p className="font-medium text-slate-200">임시 설정 입력(로컬 저장)</p>
+      <p className="mt-1 text-xs text-slate-400">
+        Vercel 환경 변수가 아직 반영되지 않아도, 여기 입력하면 이 브라우저에서 바로 동작합니다. (localStorage 저장)
+      </p>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+        <label className="space-y-1">
+          <div className="text-xs text-slate-400">MQTT WebSocket URL</div>
+          <input
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100"
+            placeholder="wss://...:8884/mqtt"
+            value={override?.mqttWsUrl ?? ""}
+            onChange={(e) =>
+              setOverride((p) => ({
+                ...(p ?? {
+                  mqttWsUrl: "",
+                  mqttUser: "",
+                  mqttPassword: "",
+                  supabaseUrl: "",
+                  supabaseAnonKey: "",
+                }),
+                mqttWsUrl: e.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className="space-y-1">
+          <div className="text-xs text-slate-400">MQTT USER</div>
+          <input
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100"
+            placeholder="(HiveMQ 사용자명)"
+            value={override?.mqttUser ?? ""}
+            onChange={(e) =>
+              setOverride((p) => ({
+                ...(p ?? {
+                  mqttWsUrl: "",
+                  mqttUser: "",
+                  mqttPassword: "",
+                  supabaseUrl: "",
+                  supabaseAnonKey: "",
+                }),
+                mqttUser: e.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className="space-y-1">
+          <div className="text-xs text-slate-400">MQTT PASSWORD</div>
+          <input
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100"
+            placeholder="(HiveMQ 비밀번호)"
+            type="password"
+            value={override?.mqttPassword ?? ""}
+            onChange={(e) =>
+              setOverride((p) => ({
+                ...(p ?? {
+                  mqttWsUrl: "",
+                  mqttUser: "",
+                  mqttPassword: "",
+                  supabaseUrl: "",
+                  supabaseAnonKey: "",
+                }),
+                mqttPassword: e.target.value,
+              }))
+            }
+          />
+        </label>
+        <div />
+        <label className="space-y-1">
+          <div className="text-xs text-slate-400">Supabase URL</div>
+          <input
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100"
+            placeholder="https://xxxxx.supabase.co"
+            value={override?.supabaseUrl ?? ""}
+            onChange={(e) =>
+              setOverride((p) => ({
+                ...(p ?? {
+                  mqttWsUrl: "",
+                  mqttUser: "",
+                  mqttPassword: "",
+                  supabaseUrl: "",
+                  supabaseAnonKey: "",
+                }),
+                supabaseUrl: e.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className="space-y-1">
+          <div className="text-xs text-slate-400">Supabase anon key</div>
+          <input
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2 text-sm text-slate-100"
+            placeholder="eyJhbGciOi..."
+            value={override?.supabaseAnonKey ?? ""}
+            onChange={(e) =>
+              setOverride((p) => ({
+                ...(p ?? {
+                  mqttWsUrl: "",
+                  mqttUser: "",
+                  mqttPassword: "",
+                  supabaseUrl: "",
+                  supabaseAnonKey: "",
+                }),
+                supabaseAnonKey: e.target.value,
+              }))
+            }
+          />
+        </label>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+          onClick={() => {
+            const v = override ?? {
+              mqttWsUrl: "",
+              mqttUser: "",
+              mqttPassword: "",
+              supabaseUrl: "",
+              supabaseAnonKey: "",
+            };
+            localStorage.setItem("smartfarm_env_override_v1", JSON.stringify(v));
+          }}
+        >
+          저장
+        </button>
+        <button
+          className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm text-slate-200 hover:bg-slate-900/60"
+          onClick={() => {
+            localStorage.removeItem("smartfarm_env_override_v1");
+            setOverride(null);
+          }}
+        >
+          초기화
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   const envHint =
     publicEnvError || missingMqttKeys.length > 0 || missingSupabaseKeys.length > 0 ? (
@@ -93,8 +280,8 @@ export function Dashboard() {
 
   const loadHistory = useCallback(async () => {
     setSupabaseError(null);
-    const url = env?.supabase?.url?.trim() || "";
-    const anon = env?.supabase?.anonKey?.trim() || "";
+    const url = effectiveSupabaseUrl;
+    const anon = effectiveSupabaseAnon;
     if (!url || !anon) {
       setSupabaseOk(false);
       return;
@@ -119,7 +306,7 @@ export function Dashboard() {
       humidity: Number(r.humidity),
     }));
     setHistory(rows.reverse());
-  }, [env]);
+  }, [effectiveSupabaseAnon, effectiveSupabaseUrl]);
 
   useEffect(() => {
     if (env) void loadHistory();
@@ -131,8 +318,8 @@ export function Dashboard() {
       if (now - lastSaveRef.current < 10000) return;
       lastSaveRef.current = now;
 
-      const url = env?.supabase?.url?.trim() || "";
-      const anon = env?.supabase?.anonKey?.trim() || "";
+      const url = effectiveSupabaseUrl;
+      const anon = effectiveSupabaseAnon;
       if (!url || !anon) return;
       const sb = createClient(url, anon);
 
@@ -147,7 +334,7 @@ export function Dashboard() {
       }
       void loadHistory();
     },
-    [env, loadHistory]
+    [effectiveSupabaseAnon, effectiveSupabaseUrl, loadHistory]
   );
 
   useEffect(() => {
@@ -241,6 +428,7 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       {envHint}
+      {overridePanel}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700/60 bg-panel px-4 py-3 text-sm">
         <div>
           <span className="text-slate-400">MQTT </span>
