@@ -119,7 +119,48 @@ export function Dashboard() {
 
   const hasAnyMissing = missingMqttKeys.length > 0 || missingSupabaseKeys.length > 0;
 
-  const overridePanel = hasAnyMissing ? (
+  const usingOverride =
+    Boolean(override?.mqttWsUrl?.trim()) ||
+    Boolean(override?.mqttUser?.trim()) ||
+    Boolean(override?.mqttPassword?.trim()) ||
+    Boolean(override?.supabaseUrl?.trim()) ||
+    Boolean(override?.supabaseAnonKey?.trim());
+
+  const appliedHint = (
+    <div className="rounded-xl border border-slate-700/60 bg-panel px-4 py-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium text-slate-200">현재 적용 상태</p>
+        <span className="text-xs text-slate-400">
+          적용 출처: {usingOverride ? "임시 설정(localStorage)" : "Vercel/.env 런타임(public-env)"}
+        </span>
+      </div>
+      <ul className="mt-2 grid grid-cols-1 gap-1 text-xs text-slate-400 md:grid-cols-2">
+        <li>
+          MQTT URL:{" "}
+          <span className="text-slate-200">{wsUrl ? "OK" : "없음"}</span>
+        </li>
+        <li>
+          MQTT USER/PASS:{" "}
+          <span className="text-slate-200">{user && pass ? "OK" : "없음"}</span>
+        </li>
+        <li>
+          Supabase URL:{" "}
+          <span className="text-slate-200">{effectiveSupabaseUrl ? "OK" : "없음"}</span>
+        </li>
+        <li>
+          Supabase anon key:{" "}
+          <span className="text-slate-200">{effectiveSupabaseAnon ? "OK" : "없음"}</span>
+        </li>
+      </ul>
+      {hasAnyMissing ? (
+        <p className="mt-2 text-xs text-amber-200/90">
+          누락: <span className="font-mono">{[...missingMqttKeys, ...missingSupabaseKeys].join(", ")}</span>
+        </p>
+      ) : null}
+    </div>
+  );
+
+  const overridePanel = (
     <div className="rounded-xl border border-slate-700/60 bg-panel px-4 py-4 text-sm">
       <p className="font-medium text-slate-200">임시 설정 입력(로컬 저장)</p>
       <p className="mt-1 text-xs text-slate-400">
@@ -245,7 +286,7 @@ export function Dashboard() {
             localStorage.setItem("smartfarm_env_override_v1", JSON.stringify(v));
           }}
         >
-          저장
+          저장(즉시 적용)
         </button>
         <button
           className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2 text-sm text-slate-200 hover:bg-slate-900/60"
@@ -258,7 +299,7 @@ export function Dashboard() {
         </button>
       </div>
     </div>
-  ) : null;
+  );
 
   const envHint =
     publicEnvError || missingMqttKeys.length > 0 || missingSupabaseKeys.length > 0 ? (
@@ -440,6 +481,7 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       {envHint}
+      {appliedHint}
       {overridePanel}
       {wsUrl && /:8883(\/|$)/.test(wsUrl) ? (
         <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
