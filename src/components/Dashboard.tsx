@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { connect, type MqttClient } from "mqtt";
+import mqtt, { type MqttClient } from "mqtt";
 import { MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS, MQTT_TOPIC_TEMP } from "@/lib/mqtt-topics";
 import { normalizeMqttWsUrl } from "@/lib/env-public";
 import { StatusCards } from "@/components/StatusCards";
@@ -164,7 +164,7 @@ export function Dashboard() {
     }, 8000);
 
     try {
-      const client = connect(wsUrl, {
+      const client = mqtt.connect(wsUrl, {
         username: user,
         password: pass,
         clientId: `web-${Math.random().toString(16).slice(2, 10)}`,
