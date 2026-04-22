@@ -164,7 +164,15 @@ export function Dashboard() {
     }, 8000);
 
     try {
-      const client = mqtt.connect(wsUrl, {
+      const maybeModule: any = mqtt as any;
+      const connectFn =
+        maybeModule?.connect ?? maybeModule?.default?.connect ?? maybeModule;
+
+      if (typeof connectFn !== "function") {
+        throw new TypeError("MQTT connect 함수를 찾지 못했습니다.");
+      }
+
+      const client = connectFn(wsUrl, {
         username: user,
         password: pass,
         clientId: `web-${Math.random().toString(16).slice(2, 10)}`,
@@ -194,14 +202,14 @@ export function Dashboard() {
         setMqttReady(false);
       });
 
-      client.on("error", (err) => {
+      client.on("error", (err: unknown) => {
         clearTimeout(timeout);
         setMqttStatus("끊김");
         setMqttReady(false);
         setMqttError(String((err as any)?.message || err));
       });
 
-      client.on("message", async (topic, payload) => {
+      client.on("message", async (topic: string, payload: any) => {
         const msg = payload.toString();
         let t = temp;
         let h = humi;
