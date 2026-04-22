@@ -1,133 +1,372 @@
-import mqtt from "mqtt";
-import { createClient } from "@supabase/supabase-js";
+/* eslint-disable react-hooks/exhaustive-deps */
+"use client";
 
-useEffect(() => {
-  if (!effectiveMqttWsUrl || !user || !pass || !wsUrl) {
-    setMqttStatus("설정없음");
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+import { connect, type MqttClient } from "mqtt";
+import { MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS, MQTT_TOPIC_TEMP } from "@/lib/mqtt-topics";
+import { normalizeMqttWsUrl } from "@/lib/env-public";
+import { StatusCards } from "@/components/StatusCards";
+import { SensorCharts } from "@/components/SensorCharts";
+import { PumpLedControls } from "@/components/PumpLedControls";
+import type { SensorRow } from "@/lib/types";
+
+type MqttStatus = "설정없음" | "연결 중" | "연결됨" | "끊김";
+type HistoryPoint = { time: string; temperature: number; humidity: number };
+
+const LS_KEYS = {
+  mqttWsUrl: "sf.mqtt.wsUrl",
+  mqttUser: "sf.mqtt.user",
+  mqttPassword: "sf.mqtt.password",
+  supabaseUrl: "sf.sb.url",
+  supabaseAnon: "sf.sb.anon",
+} as const;
+
+function stripQuotesAndTrim(v: string) {
+  const trimmed = v.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function safeReadLS(key: string): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(key) ?? "";
+}
+
+function safeWriteLS(key: string, value: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, value);
+}
+
+export function Dashboard() {
+  const clientRef = useRef<MqttClient | null>(null);
+
+  const [mqttWsUrlInput, setMqttWsUrlInput] = useState("");
+  const [mqttUserInput, setMqttUserInput] = useState("");
+  const [mqttPasswordInput, setMqttPasswordInput] = useState("");
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState("");
+  const [supabaseAnonInput, setSupabaseAnonInput] = useState("");
+
+  const [mqttStatus, setMqttStatus] = useState<MqttStatus>("설정없음");
+  const [mqttReady, setMqttReady] = useState(false);
+  const [mqttError, setMqttError] = useState<string | null>(null);
+
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
+
+  const [temp, setTemp] = useState<number | null>(null);
+  const [humi, setHumi] = useState<number | null>(null);
+  const [lastStatus, setLastStatus] = useState<string>("—");
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
+
+  useEffect(() => {
+    const envMqttWsUrl = process.env.NEXT_PUBLIC_MQTT_WS_URL ?? "";
+    const envMqttUser = process.env.NEXT_PUBLIC_MQTT_USER ?? "";
+    const envMqttPassword = process.env.NEXT_PUBLIC_MQTT_PASSWORD ?? "";
+    const envSbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    const envSbAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
+    setMqttWsUrlInput(safeReadLS(LS_KEYS.mqttWsUrl) || envMqttWsUrl);
+    setMqttUserInput(safeReadLS(LS_KEYS.mqttUser) || envMqttUser);
+    setMqttPasswordInput(safeReadLS(LS_KEYS.mqttPassword) || envMqttPassword);
+    setSupabaseUrlInput(safeReadLS(LS_KEYS.supabaseUrl) || envSbUrl);
+    setSupabaseAnonInput(safeReadLS(LS_KEYS.supabaseAnon) || envSbAnon);
+  }, []);
+
+  const effectiveMqttWsUrl = useMemo(() => {
+    const raw = stripQuotesAndTrim(mqttWsUrlInput);
+    return normalizeMqttWsUrl(raw) ?? "";
+  }, [mqttWsUrlInput]);
+
+  const effectiveSupabaseUrl = useMemo(
+    () => stripQuotesAndTrim(supabaseUrlInput),
+    [supabaseUrlInput]
+  );
+  const effectiveSupabaseAnon = useMemo(
+    () => stripQuotesAndTrim(supabaseAnonInput),
+    [supabaseAnonInput]
+  );
+
+  const canConnect = Boolean(
+    effectiveMqttWsUrl && mqttUserInput.trim() && mqttPasswordInput.trim()
+  );
+  const canUseSupabase = Boolean(effectiveSupabaseUrl && effectiveSupabaseAnon);
+
+  const supabase = useMemo(() => {
+    if (!canUseSupabase) return null;
+    try {
+      return createClient(effectiveSupabaseUrl, effectiveSupabaseAnon);
+    } catch {
+      return null;
+    }
+  }, [canUseSupabase, effectiveSupabaseUrl, effectiveSupabaseAnon]);
+
+  const loadHistory = async () => {
+    if (!supabase) return;
+    setSupabaseError(null);
+
+    const { data, error } = await supabase
+      .from("sensor_data")
+      .select("created_at,temperature,humidity")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      setSupabaseError(error.message);
+      return;
+    }
+
+    const rows = (data ?? []) as SensorRow[];
+    const points = rows
+      .slice()
+      .reverse()
+      .map((r) => ({
+        time: r.created_at ? new Date(r.created_at).toLocaleTimeString("ko-KR") : "",
+        temperature: r.temperature,
+        humidity: r.humidity,
+      }));
+
+    setHistory(points);
+  };
+
+  useEffect(() => {
+    loadHistory();
+    const id = setInterval(loadHistory, 10_000);
+    return () => clearInterval(id);
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!canConnect) {
+      setMqttStatus("설정없음");
+      setMqttReady(false);
+      setMqttError(null);
+      return;
+    }
+
+    const wsUrl = effectiveMqttWsUrl;
+    const user = mqttUserInput.trim();
+    const pass = mqttPasswordInput;
+
+    let cancelled = false;
+    setMqttStatus("연결 중");
     setMqttReady(false);
     setMqttError(null);
-    return;
-  }
 
-  // ✅ Supabase client 생성
-  const sb = createClient(effectiveSupabaseUrl, effectiveSupabaseAnon);
-
-  let cancelled = false;
-
-  setMqttStatus("연결 중");
-  setMqttReady(false);
-  setMqttError(null);
-
-  const timeout = setTimeout(() => {
-    if (cancelled) return;
-    setMqttStatus("끊김");
-    setMqttReady(false);
-    setMqttError("연결 시간 초과 (8초)");
-  }, 8000);
-
-  try {
-    const client = mqtt.connect(wsUrl, {
-      username: user,
-      password: pass,
-      clientId: `web-${Math.random().toString(16).slice(2, 10)}`,
-      reconnectPeriod: 4000,
-      connectTimeout: 10000,
-      clean: true,
-    });
-
-    clientRef.current = client;
-
-    // ✅ 연결 성공
-    client.on("connect", () => {
+    const timeout = setTimeout(() => {
       if (cancelled) return;
-
-      clearTimeout(timeout);
-
-      setMqttStatus("연결됨");
-      setMqttReady(true);
-      setMqttError(null);
-
-      console.log("✅ MQTT connected");
-
-      client.subscribe([
-        MQTT_TOPIC_TEMP,
-        MQTT_TOPIC_HUMI,
-        MQTT_TOPIC_STATUS,
-      ]);
-    });
-
-    client.on("reconnect", () => {
-      setMqttStatus("연결 중");
-      setMqttReady(false);
-    });
-
-    client.on("offline", () => {
       setMqttStatus("끊김");
       setMqttReady(false);
-    });
+      setMqttError("연결 시간 초과 (8초)");
+    }, 8000);
 
-    client.on("error", (err) => {
-      clearTimeout(timeout);
-      setMqttStatus("끊김");
-      setMqttReady(false);
-      setMqttError(String(err?.message || err));
-    });
+    try {
+      const client = connect(wsUrl, {
+        username: user,
+        password: pass,
+        clientId: `web-${Math.random().toString(16).slice(2, 10)}`,
+        reconnectPeriod: 4000,
+        connectTimeout: 10_000,
+        clean: true,
+      });
 
-    // 🔥 MQTT 수신 + Supabase 저장
-    client.on("message", async (topic, payload) => {
-      const msg = payload.toString();
+      clientRef.current = client;
 
-      let t = temp;
-      let h = humi;
+      client.on("connect", () => {
+        if (cancelled) return;
+        clearTimeout(timeout);
+        setMqttStatus("연결됨");
+        setMqttReady(true);
+        setMqttError(null);
+        client.subscribe([MQTT_TOPIC_TEMP, MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS]);
+      });
 
-      if (topic === MQTT_TOPIC_TEMP) {
-        const v = parseFloat(msg);
-        if (!Number.isNaN(v)) {
-          setTemp(v);
-          t = v;
+      client.on("reconnect", () => {
+        setMqttStatus("연결 중");
+        setMqttReady(false);
+      });
+
+      client.on("offline", () => {
+        setMqttStatus("끊김");
+        setMqttReady(false);
+      });
+
+      client.on("error", (err) => {
+        clearTimeout(timeout);
+        setMqttStatus("끊김");
+        setMqttReady(false);
+        setMqttError(String((err as any)?.message || err));
+      });
+
+      client.on("message", async (topic, payload) => {
+        const msg = payload.toString();
+        let t = temp;
+        let h = humi;
+
+        if (topic === MQTT_TOPIC_TEMP) {
+          const v = Number.parseFloat(msg);
+          if (!Number.isNaN(v)) {
+            setTemp(v);
+            t = v;
+          }
+        } else if (topic === MQTT_TOPIC_HUMI) {
+          const v = Number.parseFloat(msg);
+          if (!Number.isNaN(v)) {
+            setHumi(v);
+            h = v;
+          }
+        } else if (topic === MQTT_TOPIC_STATUS) {
+          setLastStatus(msg);
         }
 
-      } else if (topic === MQTT_TOPIC_HUMI) {
-        const v = parseFloat(msg);
-        if (!Number.isNaN(v)) {
-          setHumi(v);
-          h = v;
-        }
-
-      } else if (topic === MQTT_TOPIC_STATUS) {
-        setLastStatus(msg);
-      }
-
-      // ✅ 온도+습도 둘 다 있을 때만 DB 저장
-      if (t != null && h != null) {
-        try {
-          await sb.from("sensor_data").insert({
+        if (supabase && t != null && h != null) {
+          const { error } = await supabase.from("sensor_data").insert({
             temperature: t,
             humidity: h,
           });
-          console.log("📦 Supabase 저장 완료", t, h);
-        } catch (e) {
-          console.error("❌ Supabase 저장 실패", e);
+
+          if (error) {
+            setSupabaseError(error.message);
+          } else {
+            setSupabaseError(null);
+          }
         }
-      }
-    });
-
-  } catch (e) {
-    clearTimeout(timeout);
-    setMqttStatus("끊김");
-    setMqttReady(false);
-    setMqttError(`mqtt 초기화 실패: ${String(e)}`);
-  }
-
-  return () => {
-    cancelled = true;
-    clearTimeout(timeout);
-
-    if (clientRef.current) {
-      try {
-        clientRef.current.end(true);
-      } catch {}
-      clientRef.current = null;
+      });
+    } catch (e) {
+      clearTimeout(timeout);
+      setMqttStatus("끊김");
+      setMqttReady(false);
+      setMqttError(`mqtt 초기화 실패: ${String(e)}`);
     }
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+      if (clientRef.current) {
+        try {
+          clientRef.current.end(true);
+        } catch {}
+        clientRef.current = null;
+      }
+    };
+  }, [effectiveMqttWsUrl, mqttUserInput, mqttPasswordInput, supabase, canConnect]);
+
+  const saveNow = () => {
+    safeWriteLS(LS_KEYS.mqttWsUrl, mqttWsUrlInput);
+    safeWriteLS(LS_KEYS.mqttUser, mqttUserInput);
+    safeWriteLS(LS_KEYS.mqttPassword, mqttPasswordInput);
+    safeWriteLS(LS_KEYS.supabaseUrl, supabaseUrlInput);
+    safeWriteLS(LS_KEYS.supabaseAnon, supabaseAnonInput);
   };
-}, [effectiveMqttWsUrl, wsUrl, user, pass, effectiveSupabaseUrl, effectiveSupabaseAnon]);
+
+  const reset = () => {
+    setMqttWsUrlInput("");
+    setMqttUserInput("");
+    setMqttPasswordInput("");
+    setSupabaseUrlInput("");
+    setSupabaseAnonInput("");
+    saveNow();
+  };
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-xl border border-slate-700/60 bg-panel p-4 shadow-lg backdrop-blur">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label className="block text-xs text-slate-400">MQTT WebSocket URL</label>
+            <input
+              value={mqttWsUrlInput}
+              onChange={(e) => setMqttWsUrlInput(e.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+              placeholder="wss://...hivemq.cloud:8884/mqtt"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="block text-xs text-slate-400">MQTT USER</label>
+            <input
+              value={mqttUserInput}
+              onChange={(e) => setMqttUserInput(e.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+              placeholder="jhk001"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="block text-xs text-slate-400">MQTT PASSWORD</label>
+            <input
+              value={mqttPasswordInput}
+              onChange={(e) => setMqttPasswordInput(e.target.value)}
+              type="password"
+              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+              placeholder="********"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="block text-xs text-slate-400">Supabase URL</label>
+            <input
+              value={supabaseUrlInput}
+              onChange={(e) => setSupabaseUrlInput(e.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+              placeholder="https://xxxx.supabase.co"
+            />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <label className="block text-xs text-slate-400">Supabase anon key</label>
+            <input
+              value={supabaseAnonInput}
+              onChange={(e) => setSupabaseAnonInput(e.target.value)}
+              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+              placeholder="eyJhbGciOi..."
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={saveNow}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+          >
+            저장(즉시 적용)
+          </button>
+          <button
+            type="button"
+            onClick={reset}
+            className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-600"
+          >
+            초기화
+          </button>
+        </div>
+      </section>
+
+      {mqttError && (
+        <section className="rounded-xl border border-rose-900/40 bg-rose-950/30 p-4 text-sm text-rose-200">
+          <div className="font-medium">MQTT 오류</div>
+          <div className="mt-1">{mqttError}</div>
+          <div className="mt-1 text-xs text-rose-200/80">
+            연결 URL: {effectiveMqttWsUrl}
+          </div>
+        </section>
+      )}
+
+      {supabaseError && (
+        <section className="rounded-xl border border-amber-900/40 bg-amber-950/30 p-4 text-sm text-amber-200">
+          <div className="font-medium">Supabase 오류</div>
+          <div className="mt-1">{supabaseError}</div>
+          <div className="mt-2 text-xs text-amber-200/80">
+            API 키가 잘못되었습니다. Supabase Settings → API의 anon public 키를 그대로 복사했고,
+            앞뒤 공백/따옴표가 섞였으면 제거했는지 확인하세요.
+          </div>
+        </section>
+      )}
+
+      <StatusCards temp={temp} humi={humi} lastStatus={lastStatus} />
+      <SensorCharts data={history} liveTemp={temp} liveHumi={humi} />
+      <PumpLedControls disabled={!mqttReady} getClient={() => clientRef.current} />
+    </div>
+  );
+}
+
+export default Dashboard;
