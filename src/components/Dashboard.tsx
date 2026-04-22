@@ -51,6 +51,8 @@ function safeWriteLS(key: string, value: string) {
 export function Dashboard() {
   const clientRef = useRef<MqttClient | null>(null);
 
+  const [showSettings, setShowSettings] = useState(false);
+
   const [mqttWsUrlInput, setMqttWsUrlInput] = useState("");
   const [mqttUserInput, setMqttUserInput] = useState("");
   const [mqttPasswordInput, setMqttPasswordInput] = useState("");
@@ -67,6 +69,28 @@ export function Dashboard() {
   const [humi, setHumi] = useState<number | null>(null);
   const [lastStatus, setLastStatus] = useState<string>("—");
   const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [nowText, setNowText] = useState<string>("");
+
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      setNowText(
+        d.toLocaleString("ko-KR", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          weekday: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        })
+      );
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const envMqttWsUrl = process.env.NEXT_PUBLIC_MQTT_WS_URL ?? "";
@@ -286,73 +310,110 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-slate-700/60 bg-panel p-4 shadow-lg backdrop-blur">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label className="block text-xs text-slate-400">MQTT WebSocket URL</label>
-            <input
-              value={mqttWsUrlInput}
-              onChange={(e) => setMqttWsUrlInput(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
-              placeholder="wss://...hivemq.cloud:8884/mqtt"
-            />
+      {/* 상단 헤더/네비 */}
+      <section className="rounded-2xl border border-slate-700/60 bg-panel p-5 shadow-lg backdrop-blur">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="sf-title text-xl font-extrabold tracking-tight text-white sm:text-2xl">
+              스마트팜 대시보드
+            </div>
+            <div className="mt-1 text-sm text-slate-400">{nowText || "—"}</div>
           </div>
-          <div className="space-y-2">
-            <label className="block text-xs text-slate-400">MQTT USER</label>
-            <input
-              value={mqttUserInput}
-              onChange={(e) => setMqttUserInput(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
-              placeholder="jhk001"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="block text-xs text-slate-400">MQTT PASSWORD</label>
-            <input
-              value={mqttPasswordInput}
-              onChange={(e) => setMqttPasswordInput(e.target.value)}
-              type="password"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
-              placeholder="********"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="block text-xs text-slate-400">Supabase URL</label>
-            <input
-              value={supabaseUrlInput}
-              onChange={(e) => setSupabaseUrlInput(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
-              placeholder="https://xxxx.supabase.co"
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <label className="block text-xs text-slate-400">Supabase anon key</label>
-            <input
-              value={supabaseAnonInput}
-              onChange={(e) => setSupabaseAnonInput(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
-              placeholder="eyJhbGciOi..."
-            />
-          </div>
-        </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={saveNow}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
-          >
-            저장(즉시 적용)
-          </button>
-          <button
-            type="button"
-            onClick={reset}
-            className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-600"
-          >
-            초기화
-          </button>
+          {/* 우상단 아이콘 네비 */}
+          <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
+            <a className="sf-icon-btn" href="#sensor">📡 센서</a>
+            <a className="sf-icon-btn" href="#db">📈 DB</a>
+            <a className="sf-icon-btn" href="#actuator">⚙️ 제어</a>
+            <a className="sf-icon-btn" href="#logs">🧾 로그</a>
+            <button
+              type="button"
+              className="sf-icon-btn"
+              onClick={() => setShowSettings((v) => !v)}
+            >
+              ⚙ 설정 {showSettings ? "닫기" : "열기"}
+            </button>
+          </div>
         </div>
       </section>
+
+      {/* 설정(접기/펼치기) */}
+      {showSettings && (
+        <section className="rounded-xl border border-slate-700/60 bg-panel p-4 shadow-lg backdrop-blur">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="sf-section-title text-base font-semibold text-white">연결 설정</h2>
+            <div className="text-xs text-slate-500">
+              저장 후 자동으로 재연결됩니다.
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="block text-xs text-slate-400">MQTT WebSocket URL</label>
+              <input
+                value={mqttWsUrlInput}
+                onChange={(e) => setMqttWsUrlInput(e.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+                placeholder="wss://...hivemq.cloud:8884/mqtt"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs text-slate-400">MQTT USER</label>
+              <input
+                value={mqttUserInput}
+                onChange={(e) => setMqttUserInput(e.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+                placeholder="jhk001"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs text-slate-400">MQTT PASSWORD</label>
+              <input
+                value={mqttPasswordInput}
+                onChange={(e) => setMqttPasswordInput(e.target.value)}
+                type="password"
+                className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+                placeholder="********"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs text-slate-400">Supabase URL</label>
+              <input
+                value={supabaseUrlInput}
+                onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+                placeholder="https://xxxx.supabase.co"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <label className="block text-xs text-slate-400">Supabase anon key</label>
+              <input
+                value={supabaseAnonInput}
+                onChange={(e) => setSupabaseAnonInput(e.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-200 outline-none"
+                placeholder="eyJhbGciOi..."
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={saveNow}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+            >
+              저장(즉시 적용)
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-600"
+            >
+              초기화
+            </button>
+          </div>
+        </section>
+      )}
 
       {mqttError && (
         <section className="rounded-xl border border-rose-900/40 bg-rose-950/30 p-4 text-sm text-rose-200">
@@ -375,9 +436,43 @@ export function Dashboard() {
         </section>
       )}
 
-      <StatusCards temp={temp} humi={humi} lastStatus={lastStatus} />
-      <SensorCharts data={history} liveTemp={temp} liveHumi={humi} />
-      <PumpLedControls disabled={!mqttReady} getClient={() => clientRef.current} />
+      <div id="logs" className="space-y-3">
+        {mqttError && (
+          <section className="rounded-xl border border-rose-900/40 bg-rose-950/30 p-4 text-sm text-rose-200">
+            <div className="sf-section-title font-semibold">MQTT 오류</div>
+            <div className="mt-1">{mqttError}</div>
+            <div className="mt-1 text-xs text-rose-200/80">
+              연결 URL: {effectiveMqttWsUrl}
+            </div>
+          </section>
+        )}
+
+        {supabaseError && (
+          <section className="rounded-xl border border-amber-900/40 bg-amber-950/30 p-4 text-sm text-amber-200">
+            <div className="sf-section-title font-semibold">Supabase 오류</div>
+            <div className="mt-1">{supabaseError}</div>
+            <div className="mt-2 text-xs text-amber-200/80">
+              anon key는 Supabase Settings → API의 anon public 키를 그대로 복사했고,
+              앞뒤 공백/따옴표/줄바꿈이 섞였으면 제거되도록 처리되어 있습니다.
+            </div>
+          </section>
+        )}
+      </div>
+
+      <div id="sensor" className="space-y-3">
+        <h2 className="sf-section-title text-base font-semibold text-white">실시간 센서</h2>
+        <StatusCards temp={temp} humi={humi} lastStatus={lastStatus} />
+      </div>
+
+      <div id="db" className="space-y-3">
+        <h2 className="sf-section-title text-base font-semibold text-white">DB 그래프</h2>
+        <SensorCharts data={history} liveTemp={temp} liveHumi={humi} />
+      </div>
+
+      <div id="actuator" className="space-y-3">
+        <h2 className="sf-section-title text-base font-semibold text-white">액츄에이터</h2>
+        <PumpLedControls disabled={!mqttReady} getClient={() => clientRef.current} />
+      </div>
     </div>
   );
 }
