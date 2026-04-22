@@ -1,4 +1,4 @@
-import mqtt from "mqtt"; // ⭐ 반드시 추가
+import mqtt from "mqtt";
 
 useEffect(() => {
   if (!effectiveMqttWsUrl || !user || !pass || !wsUrl) {
@@ -33,7 +33,6 @@ useEffect(() => {
 
     clientRef.current = client;
 
-    // ✅ 연결 성공
     client.on("connect", () => {
       if (cancelled) return;
 
@@ -45,40 +44,31 @@ useEffect(() => {
 
       console.log("✅ MQTT connected");
 
-      client.subscribe(
-        [MQTT_TOPIC_TEMP, MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS],
-        (err) => {
-          if (err) console.error("subscribe error", err);
-        }
-      );
+      client.subscribe([
+        MQTT_TOPIC_TEMP,
+        MQTT_TOPIC_HUMI,
+        MQTT_TOPIC_STATUS,
+      ]);
     });
 
-    // 🔄 재연결
     client.on("reconnect", () => {
-      console.log("🔄 reconnecting...");
       setMqttStatus("연결 중");
       setMqttReady(false);
     });
 
-    // ❌ 오프라인
     client.on("offline", () => {
-      console.log("❌ offline");
       setMqttStatus("끊김");
       setMqttReady(false);
     });
 
-    // ❌ 에러
     client.on("error", (err) => {
-      console.error("MQTT error", err);
-
       clearTimeout(timeout);
-
       setMqttStatus("끊김");
       setMqttReady(false);
       setMqttError(String(err?.message || err));
     });
 
-    // 📥 메시지 수신
+    // 🔥 MQTT 수신 → 상태만 업데이트 (DB 저장은 Realtime 기준으로)
     client.on("message", (topic, payload) => {
       const msg = payload.toString();
 
@@ -97,7 +87,6 @@ useEffect(() => {
 
   } catch (e) {
     clearTimeout(timeout);
-
     setMqttStatus("끊김");
     setMqttReady(false);
     setMqttError(`mqtt 초기화 실패: ${String(e)}`);
@@ -114,5 +103,4 @@ useEffect(() => {
       clientRef.current = null;
     }
   };
-
 }, [effectiveMqttWsUrl, wsUrl, user, pass]);
