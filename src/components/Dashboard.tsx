@@ -33,6 +33,7 @@ useEffect(() => {
 
     clientRef.current = client;
 
+    // ✅ 연결 성공
     client.on("connect", () => {
       if (cancelled) return;
 
@@ -68,7 +69,7 @@ useEffect(() => {
       setMqttError(String(err?.message || err));
     });
 
-    // 🔥 MQTT 수신 → 상태만 업데이트 (DB 저장은 Realtime 기준으로)
+    // 🔥 MQTT → 화면만 업데이트 (DB 저장 안함)
     client.on("message", (topic, payload) => {
       const msg = payload.toString();
 
