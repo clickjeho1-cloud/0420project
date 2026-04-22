@@ -33,6 +33,11 @@ function stripQuotesAndTrim(v: string) {
   return trimmed;
 }
 
+function normalizeSupabaseAnonKey(v: string) {
+  // 사용자가 복사/붙여넣기할 때 섞이는 줄바꿈/공백 등을 강제로 제거
+  return stripQuotesAndTrim(v).replace(/\s+/g, "");
+}
+
 function safeReadLS(key: string): string {
   if (typeof window === "undefined") return "";
   return window.localStorage.getItem(key) ?? "";
@@ -87,7 +92,7 @@ export function Dashboard() {
     [supabaseUrlInput]
   );
   const effectiveSupabaseAnon = useMemo(
-    () => stripQuotesAndTrim(supabaseAnonInput),
+    () => normalizeSupabaseAnonKey(supabaseAnonInput),
     [supabaseAnonInput]
   );
 

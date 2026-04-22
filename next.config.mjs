@@ -1,4 +1,8 @@
 import webpack from "next/dist/compiled/webpack/webpack-lib.js";
+import { createRequire } from "module";
+import path from "path";
+
+const require = createRequire(import.meta.url);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -25,7 +29,13 @@ const nextConfig = {
       config.resolve.alias = {
         ...(config.resolve.alias || {}),
         // 브라우저에서 Node용 엔트리로 번들링되는 이슈 방지
-        mqtt: "mqtt/dist/mqtt",
+        // UMD 번들은 ESM import에서 형태가 꼬일 수 있어 ESM 번들을 강제 사용
+        // (exports 해석으로 .js가 중복되는 이슈가 있어 절대 경로로 지정)
+        mqtt: path.resolve(
+          path.dirname(require.resolve("mqtt/package.json")),
+          "dist",
+          "mqtt.esm.js"
+        ),
       };
 
       config.plugins.push(
