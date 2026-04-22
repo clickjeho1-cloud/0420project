@@ -415,27 +415,6 @@ export function Dashboard() {
         </section>
       )}
 
-      {mqttError && (
-        <section className="rounded-xl border border-rose-900/40 bg-rose-950/30 p-4 text-sm text-rose-200">
-          <div className="font-medium">MQTT 오류</div>
-          <div className="mt-1">{mqttError}</div>
-          <div className="mt-1 text-xs text-rose-200/80">
-            연결 URL: {effectiveMqttWsUrl}
-          </div>
-        </section>
-      )}
-
-      {supabaseError && (
-        <section className="rounded-xl border border-amber-900/40 bg-amber-950/30 p-4 text-sm text-amber-200">
-          <div className="font-medium">Supabase 오류</div>
-          <div className="mt-1">{supabaseError}</div>
-          <div className="mt-2 text-xs text-amber-200/80">
-            API 키가 잘못되었습니다. Supabase Settings → API의 anon public 키를 그대로 복사했고,
-            앞뒤 공백/따옴표가 섞였으면 제거했는지 확인하세요.
-          </div>
-        </section>
-      )}
-
       <div id="logs" className="space-y-3">
         {mqttError && (
           <section className="rounded-xl border border-rose-900/40 bg-rose-950/30 p-4 text-sm text-rose-200">
