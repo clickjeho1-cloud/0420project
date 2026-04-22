@@ -1,4 +1,5 @@
 import mqtt from "mqtt";
+import { createClient } from "@supabase/supabase-js";
 
 useEffect(() => {
   if (!effectiveMqttWsUrl || !user || !pass || !wsUrl) {
@@ -7,6 +8,9 @@ useEffect(() => {
     setMqttError(null);
     return;
   }
+
+  // ✅ Supabase client 생성
+  const sb = createClient(effectiveSupabaseUrl, effectiveSupabaseAnon);
 
   let cancelled = false;
 
@@ -69,20 +73,42 @@ useEffect(() => {
       setMqttError(String(err?.message || err));
     });
 
-    // 🔥 MQTT → 화면만 업데이트 (DB 저장 안함)
-    client.on("message", (topic, payload) => {
+    // 🔥 MQTT 수신 + Supabase 저장
+    client.on("message", async (topic, payload) => {
       const msg = payload.toString();
+
+      let t = temp;
+      let h = humi;
 
       if (topic === MQTT_TOPIC_TEMP) {
         const v = parseFloat(msg);
-        if (!Number.isNaN(v)) setTemp(v);
+        if (!Number.isNaN(v)) {
+          setTemp(v);
+          t = v;
+        }
 
       } else if (topic === MQTT_TOPIC_HUMI) {
         const v = parseFloat(msg);
-        if (!Number.isNaN(v)) setHumi(v);
+        if (!Number.isNaN(v)) {
+          setHumi(v);
+          h = v;
+        }
 
       } else if (topic === MQTT_TOPIC_STATUS) {
         setLastStatus(msg);
+      }
+
+      // ✅ 온도+습도 둘 다 있을 때만 DB 저장
+      if (t != null && h != null) {
+        try {
+          await sb.from("sensor_data").insert({
+            temperature: t,
+            humidity: h,
+          });
+          console.log("📦 Supabase 저장 완료", t, h);
+        } catch (e) {
+          console.error("❌ Supabase 저장 실패", e);
+        }
       }
     });
 
@@ -104,4 +130,4 @@ useEffect(() => {
       clientRef.current = null;
     }
   };
-}, [effectiveMqttWsUrl, wsUrl, user, pass]);
+}, [effectiveMqttWsUrl, wsUrl, user, pass, effectiveSupabaseUrl, effectiveSupabaseAnon]);
