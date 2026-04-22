@@ -418,68 +418,76 @@ export function Dashboard() {
       setMqttReady(false);
       setMqttError("연결 시간 초과(8초) — WebSocket URL/포트/경로(/mqtt) 및 계정 권한을 확인하세요.");
     }, 8000);
+void import("mqtt/dist/mqtt.min")
+  .then((mqtt) => {
+    if (cancelled) return;
 
-    void import("mqtt")
-      .then(({ connect }) => {
-        if (cancelled) return;
+    const { connect } = mqtt;
 
-        const client = connect(wsUrl, {
-          username: user,
-          password: pass,
-          clientId: `web-${Math.random().toString(16).slice(2, 10)}`,
-          reconnectPeriod: 4000,
-        });
+    const client = connect(wsUrl, {
+      username: user,
+      password: pass,
+      clientId: `web-${Math.random().toString(16).slice(2, 10)}`,
+      reconnectPeriod: 4000,
+      clean: true,
+    });
 
-        clientRef.current = client;
+    clientRef.current = client;
 
-        client.on("connect", () => {
-          if (cancelled) return;
-          window.clearTimeout(timeout);
-          setMqttStatus("연결됨");
-          setMqttReady(true);
-          setMqttError(null);
-          client.subscribe([MQTT_TOPIC_TEMP, MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS], (err) => {
-            if (err) console.error(err);
-          });
-        });
+    client.on("connect", () => {
+      if (cancelled) return;
+      window.clearTimeout(timeout);
+      setMqttStatus("연결됨");
+      setMqttReady(true);
+      setMqttError(null);
 
-        client.on("reconnect", () => {
-          setMqttStatus("연결 중");
-          setMqttReady(false);
-        });
-        client.on("offline", () => {
-          setMqttStatus("끊김");
-          setMqttReady(false);
-        });
-        client.on("error", (e) => {
-          console.error("MQTT", e);
-          window.clearTimeout(timeout);
-          setMqttStatus("끊김");
-          setMqttReady(false);
-          setMqttError(String((e as any)?.message || e));
-        });
+      client.subscribe(
+        [MQTT_TOPIC_TEMP, MQTT_TOPIC_HUMI, MQTT_TOPIC_STATUS],
+        (err) => {
+          if (err) console.error("subscribe error", err);
+        }
+      );
+    });
 
-        client.on("message", (topic, payload) => {
-          const msg = payload.toString();
-          if (topic === MQTT_TOPIC_TEMP) {
-            const v = parseFloat(msg);
-            if (!Number.isNaN(v)) setTemp(v);
-          } else if (topic === MQTT_TOPIC_HUMI) {
-            const v = parseFloat(msg);
-            if (!Number.isNaN(v)) setHumi(v);
-          } else if (topic === MQTT_TOPIC_STATUS) {
-            setLastStatus(msg);
-          }
-        });
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        window.clearTimeout(timeout);
-        setMqttStatus("끊김");
-        setMqttReady(false);
-        setMqttError(`mqtt 모듈 로드 실패: ${String((e as any)?.message || e)}`);
-      });
+    client.on("reconnect", () => {
+      setMqttStatus("연결 중");
+      setMqttReady(false);
+    });
 
+    client.on("offline", () => {
+      setMqttStatus("끊김");
+      setMqttReady(false);
+    });
+
+    client.on("error", (e) => {
+      console.error("MQTT", e);
+      window.clearTimeout(timeout);
+      setMqttStatus("끊김");
+      setMqttReady(false);
+      setMqttError(String((e as any)?.message || e));
+    });
+
+    client.on("message", (topic, payload) => {
+      const msg = payload.toString();
+
+      if (topic === MQTT_TOPIC_TEMP) {
+        const v = parseFloat(msg);
+        if (!Number.isNaN(v)) setTemp(v);
+      } else if (topic === MQTT_TOPIC_HUMI) {
+        const v = parseFloat(msg);
+        if (!Number.isNaN(v)) setHumi(v);
+      } else if (topic === MQTT_TOPIC_STATUS) {
+        setLastStatus(msg);
+      }
+    });
+  })
+  .catch((e) => {
+    if (cancelled) return;
+    window.clearTimeout(timeout);
+    setMqttStatus("끊김");
+    setMqttReady(false);
+    setMqttError(`mqtt 모듈 로드 실패: ${String((e as any)?.message || e)}`);
+  });
     return () => {
       cancelled = true;
       window.clearTimeout(timeout);
