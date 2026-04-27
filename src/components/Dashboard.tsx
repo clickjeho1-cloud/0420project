@@ -6,8 +6,15 @@ import { StatusCards } from "@/components/StatusCards";
 import { SensorCharts } from "@/components/SensorCharts";
 
 const MQTT_URL = "wss://broker.hivemq.com:8884/mqtt";
+
 const TOPIC_STATUS = "smartfarm/jeho123/status";
 const TOPIC_CONTROL = "smartfarm/jeho123/control";
+
+type SensorData = {
+  time: string;
+  temperature: number;
+  humidity: number;
+};
 
 export default function Dashboard() {
   const clientRef = useRef<MqttClient | null>(null);
@@ -15,7 +22,7 @@ export default function Dashboard() {
   const [connected, setConnected] = useState(false);
   const [temp, setTemp] = useState<number | null>(null);
   const [humi, setHumi] = useState<number | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<SensorData[]>([]);
   const [lastStatus, setLastStatus] = useState("");
 
   // ===== MQTT 연결 =====
@@ -30,10 +37,14 @@ export default function Dashboard() {
     client.on("connect", () => {
       console.log("MQTT 연결됨");
       setConnected(true);
-      client.subscribe("smartfarm/jeho123/status");
+      client.subscribe(TOPIC_STATUS);
     });
 
-    client.on("disconnect", () => {
+    client.on("close", () => {
+      setConnected(false);
+    });
+
+    client.on("offline", () => {
       setConnected(false);
     });
 
@@ -57,7 +68,6 @@ export default function Dashboard() {
           if (!isNaN(t)) setTemp(t);
           if (!isNaN(h)) setHumi(h);
 
-          // 그래프 저장
           if (!isNaN(t) && !isNaN(h)) {
             setHistory((prev) => [
               ...prev.slice(-29),
@@ -68,9 +78,8 @@ export default function Dashboard() {
               },
             ]);
           }
-
         } catch (e) {
-          console.log("JSON 파싱 실패");
+          console.log("JSON 파싱 실패:", msg);
         }
       }
     });
@@ -89,21 +98,18 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
 
-      {/* 상태 */}
       <StatusCards
         temp={temp}
         humi={humi}
         lastStatus={connected ? "MQTT 연결됨" : "연결 끊김"}
       />
 
-      {/* 그래프 */}
       <SensorCharts
         data={history}
         liveTemp={temp}
         liveHumi={humi}
       />
 
-      {/* 제어 */}
       <div className="flex gap-2">
         <button onClick={() => sendControl("pump_on")}>펌프 ON</button>
         <button onClick={() => sendControl("pump_off")}>펌프 OFF</button>
