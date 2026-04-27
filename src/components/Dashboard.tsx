@@ -120,9 +120,7 @@ export function Dashboard() {
     [supabaseAnonInput]
   );
 
-  const canConnect = Boolean(
-    effectiveMqttWsUrl && mqttUserInput.trim() && mqttPasswordInput.trim()
-  );
+  const canConnect = Boolean(effectiveMqttWsUrl);
   const canUseSupabase = Boolean(effectiveSupabaseUrl && effectiveSupabaseAnon);
 
   const supabase = useMemo(() => {
@@ -178,7 +176,7 @@ export function Dashboard() {
 
     const wsUrl = effectiveMqttWsUrl;
     const user = mqttUserInput.trim();
-    const pass = mqttPasswordInput;
+    const pass = mqttPasswordInput.trim();
 
     let cancelled = false;
     setMqttStatus("연결 중");
@@ -202,8 +200,8 @@ export function Dashboard() {
       }
 
       const client = connectFn(wsUrl, {
-        username: user,
-        password: pass,
+        ...(user ? { username: user } : {}),
+        ...(pass ? { password: pass } : {}),
         clientId: `web-${Math.random().toString(16).slice(2, 10)}`,
         reconnectPeriod: 4000,
         connectTimeout: 10_000,

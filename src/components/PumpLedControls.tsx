@@ -55,7 +55,7 @@ export function PumpLedControls({ disabled, getClient }: Props) {
               }`}
               onClick={() => {
                 setPump(true);
-                send("PUMP_ON");
+                send("pump_on");
               }}
             >
               ON
@@ -71,7 +71,7 @@ export function PumpLedControls({ disabled, getClient }: Props) {
               }`}
               onClick={() => {
                 setPump(false);
-                send("PUMP_OFF");
+                send("pump_off");
               }}
             >
               OFF
@@ -102,7 +102,7 @@ export function PumpLedControls({ disabled, getClient }: Props) {
               }`}
               onClick={() => {
                 setLed(true);
-                send("LED_ON");
+                send("led_on");
               }}
             >
               ON
@@ -118,7 +118,7 @@ export function PumpLedControls({ disabled, getClient }: Props) {
               }`}
               onClick={() => {
                 setLed(false);
-                send("LED_OFF");
+                send("led_off");
               }}
             >
               OFF
