@@ -448,7 +448,11 @@ export function Dashboard() {
 
       <div id="actuator" className="space-y-3">
         <h2 className="sf-section-title text-base font-semibold text-white">액츄에이터</h2>
-        <PumpLedControls disabled={!mqttReady} getClient={() => clientRef.current} />
+        <PumpLedControls
+          disabled={!mqttReady}
+          getClient={() => clientRef.current}
+          lastStatus={lastStatus}
+        />
       </div>
     </div>
   );
