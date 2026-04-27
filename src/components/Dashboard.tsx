@@ -255,6 +255,28 @@ export function Dashboard() {
           }
         } else if (topic === MQTT_TOPIC_STATUS) {
           setLastStatus(msg);
+          try {
+            const parsed = JSON.parse(msg) as Record<string, unknown>;
+            const tempFromStatus =
+              typeof parsed.temp === "number"
+                ? parsed.temp
+                : Number.parseFloat(String(parsed.temp ?? ""));
+            const humiFromStatus =
+              typeof parsed.humi === "number"
+                ? parsed.humi
+                : Number.parseFloat(String(parsed.humi ?? ""));
+
+            if (!Number.isNaN(tempFromStatus)) {
+              setTemp(tempFromStatus);
+              t = tempFromStatus;
+            }
+            if (!Number.isNaN(humiFromStatus)) {
+              setHumi(humiFromStatus);
+              h = humiFromStatus;
+            }
+          } catch {
+            // non-JSON status 메시지는 그대로 표시만 함
+          }
         }
 
         if (supabase && t != null && h != null) {
