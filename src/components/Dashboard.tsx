@@ -30,7 +30,7 @@ export default function Dashboard() {
     client.on("connect", () => {
       console.log("MQTT 연결됨");
       setConnected(true);
-      client.subscribe(TOPIC_STATUS);
+      client.subscribe("smartfarm/jeho123/status");
     });
 
     client.on("disconnect", () => {
