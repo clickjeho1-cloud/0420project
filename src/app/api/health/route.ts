@@ -5,32 +5,23 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-
-    const rows = await prisma.sensorLog.findMany({
-      where: {
-        createdAt: {
-          gte: since,
-        },
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-    });
+    await prisma.$queryRaw`SELECT 1`;
 
     return NextResponse.json({
       ok: true,
-      range: "2d",
-      count: rows.length,
-      data: rows,
+      status: "healthy",
+      database: "connected",
+      time: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[GET /api/sensors/history]", error);
+    console.error("[GET /api/health]", error);
 
     return NextResponse.json(
       {
         ok: false,
-        message: "센서 이력 데이터를 불러오지 못했습니다.",
+        status: "unhealthy",
+        database: "disconnected",
+        message: String((error as any)?.message || error),
       },
       { status: 500 }
     );
