@@ -52,6 +52,12 @@ function readNumberFromObject(obj: Record<string, unknown>, keys: string[]): num
   return null;
 }
 
+
+function clampStatusText(v: string, max = 180) {
+  if (v.length <= max) return v;
+  return `${v.slice(0, max)}…`;
+}
+
 function safeReadLS(key: string): string {
   if (typeof window === "undefined") return "";
   return window.localStorage.getItem(key) ?? "";
@@ -64,6 +70,8 @@ function safeWriteLS(key: string, value: string) {
 
 export function Dashboard() {
   const clientRef = useRef<MqttClient | null>(null);
+  const tempRef = useRef<number | null>(null);
+  const humiRef = useRef<number | null>(null);
 
   const [showSettings, setShowSettings] = useState(false);
 
@@ -81,6 +89,8 @@ export function Dashboard() {
 
   const [temp, setTemp] = useState<number | null>(null);
   const [humi, setHumi] = useState<number | null>(null);
+  const [ec, setEc] = useState<number | null>(null);
+  const [tdsEst, setTdsEst] = useState<number | null>(null);
   const [lastStatus, setLastStatus] = useState<string>("—");
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [nowText, setNowText] = useState<string>("");
@@ -150,11 +160,14 @@ export function Dashboard() {
     if (!supabase) return;
     setSupabaseError(null);
 
+    // 최근 2일간 DB 데이터만 그래프에 표시
+    const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
     const { data, error } = await supabase
       .from(SUPABASE_TABLE)
       .select("created_at,temperature,humidity")
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .gte("created_at", since)
+      .order("created_at", { ascending: true });
 
     if (error) {
       setSupabaseError(error.message);
@@ -162,14 +175,11 @@ export function Dashboard() {
     }
 
     const rows = (data ?? []) as SensorRow[];
-    const points = rows
-      .slice()
-      .reverse()
-      .map((r) => ({
-        time: r.created_at ? new Date(r.created_at).toLocaleTimeString("ko-KR") : "",
-        temperature: r.temperature,
-        humidity: r.humidity,
-      }));
+    const points = rows.map((r) => ({
+      time: r.created_at ? new Date(r.created_at).toLocaleTimeString("ko-KR") : "",
+      temperature: r.temperature,
+      humidity: r.humidity,
+    }));
 
     setHistory(points);
   };
@@ -252,61 +262,80 @@ export function Dashboard() {
 
       client.on("message", async (topic: string, payload: any) => {
         const msg = payload.toString();
-        let t = temp;
-        let h = humi;
 
         if (topic === MQTT_TOPIC_TEMP) {
           const v = Number.parseFloat(msg);
-          if (!Number.isNaN(v)) {
+          if (!Number.isNaN(v) && Number.isFinite(v)) {
+            tempRef.current = v;
             setTemp(v);
-            t = v;
           }
-        } else if (topic === MQTT_TOPIC_HUMI) {
-          const v = Number.parseFloat(msg);
-          if (!Number.isNaN(v)) {
-            setHumi(v);
-            h = v;
-          }
-        } else if (topic === MQTT_TOPIC_STATUS) {
-          setLastStatus(msg);
-          try {
-            const parsed = JSON.parse(msg) as Record<string, unknown>;
-            // 아두이노가 보내는 현재 형식:
-            // {"air_temp":23.5,"air_humi":35.0,"ec":208.00,...}
-            // 예전/다른 코드 형식도 같이 허용합니다.
-            const tempFromStatus = readNumberFromObject(parsed, [
-              "air_temp",
-              "temp",
-              "temperature",
-              "airTemperature",
-              "air_temperature",
-            ]);
-            const humiFromStatus = readNumberFromObject(parsed, [
-              "air_humi",
-              "humi",
-              "humidity",
-              "airHumidity",
-              "air_humidity",
-            ]);
-
-            if (tempFromStatus !== null) {
-              setTemp(tempFromStatus);
-              t = tempFromStatus;
-            }
-            if (humiFromStatus !== null) {
-              setHumi(humiFromStatus);
-              h = humiFromStatus;
-            }
-          } catch {
-            // non-JSON status 메시지는 그대로 표시만 함
-          }
+          return;
         }
 
-        if (supabase && t != null && h != null) {
-          const { error } = await supabase.from(SUPABASE_TABLE).insert({
-            temperature: t,
-            humidity: h,
-          });
+        if (topic === MQTT_TOPIC_HUMI) {
+          const v = Number.parseFloat(msg);
+          if (!Number.isNaN(v) && Number.isFinite(v)) {
+            humiRef.current = v;
+            setHumi(v);
+          }
+          return;
+        }
+
+        if (topic !== MQTT_TOPIC_STATUS) return;
+
+        setLastStatus(clampStatusText(msg));
+
+        try {
+          const parsed = JSON.parse(msg) as Record<string, unknown>;
+
+          // 아두이노 최종 JSON 형식:
+          // {"air_temp":27.9,"air_humi":80.0,"ec":822.00,"tds_est":411.00,...}
+          // 예전/다른 필드명도 같이 허용합니다.
+          const tempFromStatus = readNumberFromObject(parsed, [
+            "air_temp",
+            "temp",
+            "temperature",
+            "airTemperature",
+            "air_temperature",
+          ]);
+          const humiFromStatus = readNumberFromObject(parsed, [
+            "air_humi",
+            "humi",
+            "humidity",
+            "airHumidity",
+            "air_humidity",
+          ]);
+          const ecFromStatus = readNumberFromObject(parsed, ["ec", "EC", "conductivity"]);
+          const tdsFromStatus = readNumberFromObject(parsed, ["tds_est", "tds", "TDS"]);
+
+          if (tempFromStatus !== null) {
+            tempRef.current = tempFromStatus;
+            setTemp(tempFromStatus);
+          }
+          if (humiFromStatus !== null) {
+            humiRef.current = humiFromStatus;
+            setHumi(humiFromStatus);
+          }
+          if (ecFromStatus !== null) setEc(ecFromStatus);
+          if (tdsFromStatus !== null) setTdsEst(tdsFromStatus);
+
+          // DB에는 확실한 온도/습도 한 세트가 들어온 MQTT 상태 메시지에서만 저장
+          if (supabase && tempFromStatus !== null && humiFromStatus !== null) {
+            const { error } = await supabase.from(SUPABASE_TABLE).insert({
+              temperature: tempFromStatus,
+              humidity: humiFromStatus,
+            });
+
+            if (error) {
+              setSupabaseError(error.message);
+            } else {
+              setSupabaseError(null);
+            }
+          }
+        } catch {
+          // non-JSON status 메시지는 그대로 표시만 함
+        }
+      });
 
           if (error) {
             setSupabaseError(error.message);
@@ -489,6 +518,21 @@ export function Dashboard() {
       <div id="sensor" className="space-y-3">
         <h2 className="sf-section-title text-base font-semibold text-white">실시간 센서</h2>
         <StatusCards temp={temp} humi={humi} lastStatus={lastStatus} />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-700/60 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-400">EC (실시간)</div>
+            <div className="mt-3 text-2xl font-semibold text-cyan-200">
+              {ec === null ? "-" : `${ec.toFixed(0)} µS/cm`}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-700/60 bg-slate-950/30 p-4">
+            <div className="text-xs text-slate-400">TDS 추정 (실시간)</div>
+            <div className="mt-3 text-2xl font-semibold text-cyan-200">
+              {tdsEst === null ? "-" : `${tdsEst.toFixed(0)} ppm`}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="db" className="space-y-3">
