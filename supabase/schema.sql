@@ -1,5 +1,5 @@
--- Supabase SQL Editor 에서 실행 후 Table Editor 에서 확인
--- RLS 는 과제/데모용 — 운영 시 인증·정책 재설정 필요
+-- Supabase SQL Editor 에서 실행
+-- 데모용 RLS 정책입니다. 운영 배포 시에는 인증/권한 정책을 다시 설계하세요.
 
 create table if not exists public.sensor_readings (
   id bigint generated always as identity primary key,
@@ -9,6 +9,9 @@ create table if not exists public.sensor_readings (
 );
 
 alter table public.sensor_readings enable row level security;
+
+drop policy if exists "sensor_readings_select_anon" on public.sensor_readings;
+drop policy if exists "sensor_readings_insert_anon" on public.sensor_readings;
 
 create policy "sensor_readings_select_anon"
   on public.sensor_readings for select
