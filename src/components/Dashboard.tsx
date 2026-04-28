@@ -36,8 +36,20 @@ function stripQuotesAndTrim(v: string) {
 }
 
 function normalizeSupabaseAnonKey(v: string) {
-  // 복사/붙여넣기 과정에서 섞이는 공백, 줄바꿈, 따옴표 제거
+  // 사용자가 복사/붙여넣기할 때 섞이는 줄바꿈/공백 등을 강제로 제거
   return stripQuotesAndTrim(v).replace(/\s+/g, "");
+}
+
+function readNumberFromObject(obj: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const raw = obj[key];
+    if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+    if (typeof raw === "string") {
+      const n = Number.parseFloat(raw);
+      if (!Number.isNaN(n) && Number.isFinite(n)) return n;
+    }
+  }
+  return null;
 }
 
 function safeReadLS(key: string): string {
@@ -50,27 +62,8 @@ function safeWriteLS(key: string, value: string) {
   window.localStorage.setItem(key, value);
 }
 
-function toNumber(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string") {
-    const n = Number.parseFloat(value.trim());
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
-function pickNumber(obj: Record<string, unknown>, keys: string[]): number | null {
-  for (const key of keys) {
-    const n = toNumber(obj[key]);
-    if (n !== null) return n;
-  }
-  return null;
-}
-
 export function Dashboard() {
   const clientRef = useRef<MqttClient | null>(null);
-  const tempRef = useRef<number | null>(null);
-  const humiRef = useRef<number | null>(null);
 
   const [showSettings, setShowSettings] = useState(false);
 
@@ -91,16 +84,6 @@ export function Dashboard() {
   const [lastStatus, setLastStatus] = useState<string>("—");
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [nowText, setNowText] = useState<string>("");
-
-  const updateTemp = (value: number) => {
-    tempRef.current = value;
-    setTemp(value);
-  };
-
-  const updateHumi = (value: number) => {
-    humiRef.current = value;
-    setHumi(value);
-  };
 
   useEffect(() => {
     const tick = () => {
@@ -146,7 +129,6 @@ export function Dashboard() {
     () => stripQuotesAndTrim(supabaseUrlInput),
     [supabaseUrlInput]
   );
-
   const effectiveSupabaseAnon = useMemo(
     () => normalizeSupabaseAnonKey(supabaseAnonInput),
     [supabaseAnonInput]
@@ -270,47 +252,60 @@ export function Dashboard() {
 
       client.on("message", async (topic: string, payload: any) => {
         const msg = payload.toString();
+        let t = temp;
+        let h = humi;
 
         if (topic === MQTT_TOPIC_TEMP) {
-          const v = toNumber(msg);
-          if (v !== null) updateTemp(v);
+          const v = Number.parseFloat(msg);
+          if (!Number.isNaN(v)) {
+            setTemp(v);
+            t = v;
+          }
         } else if (topic === MQTT_TOPIC_HUMI) {
-          const v = toNumber(msg);
-          if (v !== null) updateHumi(v);
+          const v = Number.parseFloat(msg);
+          if (!Number.isNaN(v)) {
+            setHumi(v);
+            h = v;
+          }
         } else if (topic === MQTT_TOPIC_STATUS) {
           setLastStatus(msg);
           try {
             const parsed = JSON.parse(msg) as Record<string, unknown>;
-
-            // 아두이노 현재 payload: {"air_temp":27.3,"air_humi":83.0,"ec":208.00,...}
-            // 예전 payload나 다른 센서명도 같이 허용
-            const tempFromStatus = pickNumber(parsed, [
+            // 아두이노가 보내는 현재 형식:
+            // {"air_temp":23.5,"air_humi":35.0,"ec":208.00,...}
+            // 예전/다른 코드 형식도 같이 허용합니다.
+            const tempFromStatus = readNumberFromObject(parsed, [
               "air_temp",
               "temp",
               "temperature",
               "airTemperature",
+              "air_temperature",
             ]);
-            const humiFromStatus = pickNumber(parsed, [
+            const humiFromStatus = readNumberFromObject(parsed, [
               "air_humi",
               "humi",
               "humidity",
               "airHumidity",
+              "air_humidity",
             ]);
 
-            if (tempFromStatus !== null) updateTemp(tempFromStatus);
-            if (humiFromStatus !== null) updateHumi(humiFromStatus);
+            if (tempFromStatus !== null) {
+              setTemp(tempFromStatus);
+              t = tempFromStatus;
+            }
+            if (humiFromStatus !== null) {
+              setHumi(humiFromStatus);
+              h = humiFromStatus;
+            }
           } catch {
-            // JSON이 아닌 상태 메시지는 최근 상태 카드에만 표시
+            // non-JSON status 메시지는 그대로 표시만 함
           }
         }
 
-        const latestTemp = tempRef.current;
-        const latestHumi = humiRef.current;
-
-        if (supabase && latestTemp !== null && latestHumi !== null) {
+        if (supabase && t != null && h != null) {
           const { error } = await supabase.from(SUPABASE_TABLE).insert({
-            temperature: latestTemp,
-            humidity: latestHumi,
+            temperature: t,
+            humidity: h,
           });
 
           if (error) {
@@ -354,15 +349,16 @@ export function Dashboard() {
     setSupabaseUrlInput("");
     setSupabaseAnonInput("");
 
-    safeWriteLS(LS_KEYS.mqttWsUrl, "");
-    safeWriteLS(LS_KEYS.mqttUser, "");
-    safeWriteLS(LS_KEYS.mqttPassword, "");
-    safeWriteLS(LS_KEYS.supabaseUrl, "");
-    safeWriteLS(LS_KEYS.supabaseAnon, "");
+    // 기존 코드는 setState 직후 saveNow()를 호출해서 예전 값이 다시 저장될 수 있었습니다.
+    // 특히 잘못된 Supabase anon key가 localStorage에 남으면 Vercel 환경변수를 고쳐도 계속 Invalid API key가 납니다.
+    if (typeof window !== "undefined") {
+      Object.values(LS_KEYS).forEach((key) => window.localStorage.removeItem(key));
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* 상단 헤더/네비 */}
       <section className="rounded-2xl border border-slate-700/60 bg-panel p-5 shadow-lg backdrop-blur">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -372,6 +368,7 @@ export function Dashboard() {
             <div className="mt-1 text-sm text-slate-400">{nowText || "—"}</div>
           </div>
 
+          {/* 우상단 아이콘 네비 */}
           <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
             <a className="sf-icon-btn" href="#sensor">📡 센서</a>
             <a className="sf-icon-btn" href="#db">📈 DB</a>
@@ -388,11 +385,14 @@ export function Dashboard() {
         </div>
       </section>
 
+      {/* 설정(접기/펼치기) */}
       {showSettings && (
         <section className="rounded-xl border border-slate-700/60 bg-panel p-4 shadow-lg backdrop-blur">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="sf-section-title text-base font-semibold text-white">연결 설정</h2>
-            <div className="text-xs text-slate-500">저장 후 자동으로 재연결됩니다.</div>
+            <div className="text-xs text-slate-500">
+              저장 후 자동으로 재연결됩니다.
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -468,7 +468,9 @@ export function Dashboard() {
           <section className="rounded-xl border border-rose-900/40 bg-rose-950/30 p-4 text-sm text-rose-200">
             <div className="sf-section-title font-semibold">MQTT 오류</div>
             <div className="mt-1">{mqttError}</div>
-            <div className="mt-1 text-xs text-rose-200/80">연결 URL: {effectiveMqttWsUrl}</div>
+            <div className="mt-1 text-xs text-rose-200/80">
+              연결 URL: {effectiveMqttWsUrl}
+            </div>
           </section>
         )}
 
@@ -477,8 +479,8 @@ export function Dashboard() {
             <div className="sf-section-title font-semibold">Supabase 오류</div>
             <div className="mt-1">{supabaseError}</div>
             <div className="mt-2 text-xs text-amber-200/80">
-              anon key는 Supabase Settings → API의 anon public 키를 그대로 복사해야 합니다.
-              앞뒤 공백/따옴표/줄바꿈은 자동 제거되지만, 잘린 키나 service_role 키를 넣으면 오류가 납니다.
+              anon key는 Supabase Settings → API의 anon public 키를 그대로 복사했고,
+              앞뒤 공백/따옴표/줄바꿈이 섞였으면 제거되도록 처리되어 있습니다.
             </div>
           </section>
         )}
