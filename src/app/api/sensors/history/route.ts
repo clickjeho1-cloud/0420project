@@ -23,6 +23,7 @@ function toNumberOrNull(value: unknown): number | null {
 
   if (typeof value === "string") {
     const n = Number.parseFloat(value);
+
     if (!Number.isNaN(n) && Number.isFinite(n)) {
       return n;
     }
@@ -35,6 +36,7 @@ export async function GET() {
   try {
     const supabase = getSupabaseClient();
 
+    // 최근 2일간 데이터 조회
     const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data, error } = await supabase
@@ -70,7 +72,6 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const supabase = getSupabaseClient();
-
     const body = await request.json();
 
     const temperature = toNumberOrNull(body.temperature);
