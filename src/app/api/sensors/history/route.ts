@@ -17,11 +17,15 @@ function getSupabaseClient() {
 }
 
 function toNumberOrNull(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
 
   if (typeof value === "string") {
     const n = Number.parseFloat(value);
-    if (!Number.isNaN(n) && Number.isFinite(n)) return n;
+    if (!Number.isNaN(n) && Number.isFinite(n)) {
+      return n;
+    }
   }
 
   return null;
@@ -32,6 +36,7 @@ function errorToMessage(error: unknown) {
 
   if (typeof error === "object") {
     const e = error as any;
+
     return [
       e.message,
       e.details,
@@ -49,6 +54,7 @@ export async function GET() {
   try {
     const supabase = getSupabaseClient();
 
+    // 최근 2일간 데이터 조회
     const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
     const { data, error } = await supabase
@@ -58,7 +64,15 @@ export async function GET() {
       .order("created_at", { ascending: true });
 
     if (error) {
-      throw error;
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "센서 이력 데이터를 불러오지 못했습니다.",
+          error: errorToMessage(error),
+          table: SUPABASE_TABLE,
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -100,6 +114,29 @@ export async function POST(request: Request) {
       );
     }
 
+    // 비정상값 방어: 공개 API이므로 너무 말 안 되는 값은 저장하지 않음
+    if (temperature < -30 || temperature > 80) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "temperature 값이 허용 범위를 벗어났습니다.",
+          temperature,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (humidity < 0 || humidity > 100) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "humidity 값이 허용 범위를 벗어났습니다.",
+          humidity,
+        },
+        { status: 400 }
+      );
+    }
+
     const insertPayload = {
       temperature,
       humidity,
@@ -117,8 +154,8 @@ export async function POST(request: Request) {
           ok: false,
           message: "센서 이력 데이터를 저장하지 못했습니다.",
           error: errorToMessage(error),
-          insertPayload,
           table: SUPABASE_TABLE,
+          insertPayload,
         },
         { status: 500 }
       );
