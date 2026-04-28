@@ -40,15 +40,11 @@ function readNumberFromObject(obj: Record<string, unknown>, keys: string[]): num
   for (const key of keys) {
     const raw = obj[key];
 
-    if (typeof raw === "number" && Number.isFinite(raw)) {
-      return raw;
-    }
+    if (typeof raw === "number" && Number.isFinite(raw)) return raw;
 
     if (typeof raw === "string") {
       const n = Number.parseFloat(raw);
-      if (!Number.isNaN(n) && Number.isFinite(n)) {
-        return n;
-      }
+      if (!Number.isNaN(n) && Number.isFinite(n)) return n;
     }
   }
 
@@ -166,7 +162,6 @@ export function Dashboard() {
     try {
       const now = Date.now();
 
-      // DB 저장은 너무 자주 하지 않도록 최소 5초 간격
       if (now - lastDbSaveAtRef.current < 5000) return;
       lastDbSaveAtRef.current = now;
 
@@ -436,16 +431,12 @@ export function Dashboard() {
             <h2 className="sf-section-title text-base font-semibold text-white">
               연결 설정
             </h2>
-            <div className="text-xs text-slate-500">
-              저장 후 자동으로 재연결됩니다.
-            </div>
+            <div className="text-xs text-slate-500">저장 후 자동으로 재연결됩니다.</div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="block text-xs text-slate-400">
-                MQTT WebSocket URL
-              </label>
+              <label className="block text-xs text-slate-400">MQTT WebSocket URL</label>
               <input
                 value={mqttWsUrlInput}
                 onChange={(e) => setMqttWsUrlInput(e.target.value)}
@@ -465,9 +456,7 @@ export function Dashboard() {
             </div>
 
             <div className="space-y-2 sm:col-span-2">
-              <label className="block text-xs text-slate-400">
-                MQTT PASSWORD
-              </label>
+              <label className="block text-xs text-slate-400">MQTT PASSWORD</label>
               <input
                 value={mqttPasswordInput}
                 onChange={(e) => setMqttPasswordInput(e.target.value)}
