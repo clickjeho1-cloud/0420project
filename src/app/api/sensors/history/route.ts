@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma";
+import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+
+const SUPABASE_TABLE = "sensor_readings";
+
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anon) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL 또는 NEXT_PUBLIC_SUPABASE_ANON_KEY가 없습니다.");
+  }
+
+  return createClient(url, anon);
+}
 
 function toNumberOrNull(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -20,31 +33,25 @@ function toNumberOrNull(value: unknown): number | null {
 
 export async function GET() {
   try {
-    const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const supabase = getSupabaseClient();
 
-    const rows = await prisma.sensorReading.findMany({
-      where: {
-        createdAt: {
-          gte: since,
-        },
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-    });
+    const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
-    const data = rows.map((row) => ({
-      id: row.id,
-      created_at: row.createdAt,
-      temperature: row.temperature,
-      humidity: row.humidity,
-    }));
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLE)
+      .select("id, created_at, temperature, humidity")
+      .gte("created_at", since)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({
       ok: true,
       range: "2d",
-      count: data.length,
-      data,
+      count: data?.length ?? 0,
+      data: data ?? [],
     });
   } catch (error) {
     console.error("[GET /api/sensors/history]", error);
@@ -62,6 +69,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const supabase = getSupabaseClient();
+
     const body = await request.json();
 
     const temperature = toNumberOrNull(body.temperature);
@@ -77,21 +86,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const row = await prisma.sensorReading.create({
-      data: {
+    const { data, error } = await supabase
+      .from(SUPABASE_TABLE)
+      .insert({
         temperature,
         humidity,
-      },
-    });
+      })
+      .select("id, created_at, temperature, humidity")
+      .single();
+
+    if (error) {
+      throw error;
+    }
 
     return NextResponse.json({
       ok: true,
-      data: {
-        id: row.id,
-        created_at: row.createdAt,
-        temperature: row.temperature,
-        humidity: row.humidity,
-      },
+      data,
     });
   } catch (error) {
     console.error("[POST /api/sensors/history]", error);
