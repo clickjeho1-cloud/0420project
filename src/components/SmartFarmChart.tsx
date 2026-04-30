@@ -1,62 +1,135 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
 import { supabase } from '@/lib/supabase';
 
-export default function SmartFarmChart() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<any>(null);
+type Row = {
+  temperature: number;
+  humidity: number;
+  created_at: string;
+};
 
+export function SmartFarmChart3() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  const [rows, setRows] = useState<Row[]>([]);
+
+  // 🔥 최초 데이터 로드
   useEffect(() => {
-    const ctx = canvasRef.current?.getContext('2d');
+    const fetchInitial = async () => {
+      const { data, error } = await supabase
+        .from('sensor_readings')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .limit(60);
+
+      if (!error && data) {
+        setRows(data as Row[]);
+      }
+    };
+
+    fetchInitial();
+  }, []);
+
+  // 🔥 실시간 INSERT 감지
+  useEffect(() => {
+    const channel = supabase
+      .channel('sensor_readings_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sensor_readings',
+        },
+        (payload) => {
+          const newRow = payload.new as Row;
+
+          setRows((prev) => {
+            const updated = [...prev, newRow];
+            return updated.slice(-60); // 최근 60개 유지
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // 🔥 차트 생성 / 업데이트
+  useEffect(() => {
+    if (!canvasRef.current || rows.length === 0) return;
+
+    const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
+
+    // 기존 차트 제거
+    if (chartRef.current) {
+      chartRef.current.destroy();
+    }
 
     chartRef.current = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: [],
+        labels: rows.map(() => ''),
         datasets: [
-          { label: 'Sensor', borderColor: 'blue', data: [] },
-          { label: 'Error', borderColor: 'orange', data: [] },
-          { label: 'Integral', borderColor: 'green', data: [] },
-          { label: 'Derivative', borderColor: 'purple', data: [] },
-          { label: 'Output', borderColor: 'red', borderDash: [5,5], data: [] },
-        ]
+          {
+            label: 'Temperature (°C)',
+            borderColor: 'red',
+            backgroundColor: 'rgba(255,0,0,0.1)',
+            data: rows.map((r) => r.temperature),
+            tension: 0.3,
+          },
+          {
+            label: 'Humidity (%)',
+            borderColor: 'blue',
+            backgroundColor: 'rgba(0,0,255,0.1)',
+            data: rows.map((r) => r.humidity),
+            tension: 0.3,
+          },
+        ],
       },
-      options: { animation: false }
+      options: {
+        responsive: true,
+        animation: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        scales: {
+          x: {
+            display: false,
+          },
+          y: {
+            beginAtZero: false,
+          },
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: 'white',
+            },
+          },
+        },
+      },
     });
+  }, [rows]);
 
-    loadData();
-
-    const interval = setInterval(loadData, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  async function loadData() {
-    const { data } = await supabase
-      .from('sensor_pid')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(30);
-
-    if (!data || data.length === 0) return;
-
-    const rows = data.reverse();
-
-    const chart = chartRef.current;
-
-    chart.data.labels = rows.map(() => '');
-
-    chart.data.datasets[0].data = rows.map(r => Number(r.sensor));
-    chart.data.datasets[1].data = rows.map(r => Number(r.error));
-    chart.data.datasets[2].data = rows.map(r => Number(r.integral));
-    chart.data.datasets[3].data = rows.map(r => Number(r.derivative));
-    chart.data.datasets[4].data = rows.map(r => Number(r.output));
-
-    chart.update();
-  }
-
-  return <canvas ref={canvasRef} style={{ height: 300 }} />;
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '320px',
+        background: '#0f172a',
+        borderRadius: '10px',
+        padding: '10px',
+      }}
+    >
+      <canvas ref={canvasRef} />
+    </div>
+  );
 }
