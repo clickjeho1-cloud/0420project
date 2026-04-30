@@ -7,10 +7,8 @@ import { supabase } from '../../../lib/supabase';
 export function SmartFarmChart3() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<any>(null);
-
   const [rows, setRows] = useState<any[]>([]);
 
-  // 🔥 최초 데이터
   useEffect(() => {
     const fetchData = async () => {
       const { data } = await supabase
@@ -25,16 +23,13 @@ export function SmartFarmChart3() {
     fetchData();
   }, []);
 
-  // 🔥 차트 렌더
   useEffect(() => {
     if (!canvasRef.current || rows.length === 0) return;
 
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
-    if (chartRef.current) {
-      chartRef.current.destroy();
-    }
+    if (chartRef.current) chartRef.current.destroy();
 
     chartRef.current = new Chart(ctx, {
       type: 'line',
@@ -54,8 +49,8 @@ export function SmartFarmChart3() {
         ],
       },
       options: {
-        responsive: true,
         animation: false,
+        responsive: true,
       },
     });
   }, [rows]);
