@@ -1,7 +1,7 @@
 
 'use client';
 
-import SmartFarmChart from './components/SmartFarmChart';
+import SmartFarmChart from './components/SmartFarmChart3';
 import WeatherPanel from './components/WeatherPanel';
 
 export default function Dashboard() {
