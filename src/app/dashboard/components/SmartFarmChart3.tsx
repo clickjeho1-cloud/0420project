@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { supabase } from '../../../lib/supabase';
 
-export function SmartFarmChart3() {
+export default function SmartFarmChart() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<any>(null);
 
@@ -30,12 +30,12 @@ export function SmartFarmChart3() {
         ),
         datasets: [
           {
-            label: '온도',
+            label: '온도 (°C)',
             borderColor: '#ef4444',
             data: data.map((d) => d.temperature),
           },
           {
-            label: '습도',
+            label: '습도 (%)',
             borderColor: '#3b82f6',
             data: data.map((d) => d.humidity),
           },
