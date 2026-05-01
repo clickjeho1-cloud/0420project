@@ -9,9 +9,7 @@ export default function Dashboard() {
     <div style={{ padding: 40 }}>
       <h1>🌱 스마트팜 대시보드</h1>
 
-      <div style={{ marginTop: 20 }}>
-        <ChartPanel />
-      </div>
+      <ChartPanel />
     </div>
   );
 }
