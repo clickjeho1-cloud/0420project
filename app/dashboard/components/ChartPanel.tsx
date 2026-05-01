@@ -2,61 +2,37 @@
 
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import { supabase } from '../../../lib/supabase';
 
 export default function ChartPanel() {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<any>(null);
+  const ref = useRef<HTMLCanvasElement | null>(null);
 
-  const load = async () => {
-    const { data } = await supabase
-      .from('sensor_readings')
-      .select('*')
-      .order('created_at', { ascending: true })
-      .limit(50);
+  useEffect(() => {
+    if (!ref.current) return;
 
-    if (!data || !ref.current) return;
-
-    const ctx = ref.current.getContext('2d');
-    if (!ctx) return;
-
-    if (chartRef.current) chartRef.current.destroy();
-
-    chartRef.current = new Chart(ctx, {
+    const chart = new Chart(ref.current, {
       type: 'line',
       data: {
-        labels: data.map(d =>
-          new Date(d.created_at).toLocaleTimeString()
-        ),
+        labels: ['1','2','3','4','5'],
         datasets: [
           {
-            label: '온도 (원본)',
-            data: data.map(d => d.temperature),
+            label: '온도',
+            data: [22,23,24,25,24],
             borderColor: 'red',
           },
           {
-            label: '온도 (보정)',
-            data: data.map(d => d.temperature * 0.98),
-            borderColor: 'orange',
-          },
-          {
             label: '습도',
-            data: data.map(d => d.humidity),
+            data: [50,52,55,53,54],
             borderColor: 'blue',
           },
         ],
       },
       options: {
-        animation: false,
         responsive: true,
+        animation: false,
       },
     });
-  };
 
-  useEffect(() => {
-    load();
-    const t = setInterval(load, 3000);
-    return () => clearInterval(t);
+    return () => chart.destroy();
   }, []);
 
   return <canvas ref={ref} />;
