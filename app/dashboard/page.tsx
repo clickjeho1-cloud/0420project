@@ -9,12 +9,10 @@ export default function Dashboard() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<any>(null);
 
-  const [latest, setLatest] = useState({
-    temperature: '--',
-    humidity: '--',
-  });
+  const [latest, setLatest] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
 
-  // 🔥 최신 데이터
+  // 🔥 최신값
   useEffect(() => {
     const fetchLatest = async () => {
       try {
@@ -31,22 +29,21 @@ export default function Dashboard() {
         const data = await res.json();
 
         if (data && data.length > 0) {
-          setLatest({
-            temperature: data[0].temperature,
-            humidity: data[0].humidity,
-          });
+          setLatest(data[0]);
+        } else {
+          setLatest(null);
         }
-      } catch (e) {
-        console.error(e);
+      } catch {
+        setLatest(null);
       }
     };
 
     fetchLatest();
-    const t = setInterval(fetchLatest, 3000);
+    const t = setInterval(fetchLatest, 5000);
     return () => clearInterval(t);
   }, []);
 
-  // 🔥 그래프
+  // 🔥 그래프 데이터
   useEffect(() => {
     const load = async () => {
       try {
@@ -61,45 +58,47 @@ export default function Dashboard() {
         );
 
         const data = await res.json();
-
-        if (!canvasRef.current || !data || data.length === 0) return;
-
-        const ctx = canvasRef.current.getContext('2d');
-        if (!ctx) return;
-
-        if (chartRef.current) chartRef.current.destroy();
-
-        chartRef.current = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: data.map(() => ''),
-            datasets: [
-              {
-                label: '온도',
-                data: data.map((d: any) => d.temperature),
-                borderColor: 'red',
-              },
-              {
-                label: '습도',
-                data: data.map((d: any) => d.humidity),
-                borderColor: 'blue',
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            animation: false,
-          },
-        });
-      } catch (e) {
-        console.error(e);
+        setHistory(data || []);
+      } catch {
+        setHistory([]);
       }
     };
 
     load();
-    const t = setInterval(load, 3000);
+    const t = setInterval(load, 5000);
     return () => clearInterval(t);
   }, []);
+
+  // 🔥 그래프 렌더
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    if (chartRef.current) chartRef.current.destroy();
+
+    if (history.length === 0) return;
+
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return;
+
+    chartRef.current = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: history.map(() => ''),
+        datasets: [
+          {
+            label: '온도',
+            data: history.map((d) => d.temperature),
+            borderColor: 'red',
+          },
+          {
+            label: '습도',
+            data: history.map((d) => d.humidity),
+            borderColor: 'blue',
+          },
+        ],
+      },
+    });
+  }, [history]);
 
   return (
     <div style={container}>
@@ -107,21 +106,33 @@ export default function Dashboard() {
 
       {/* 카드 */}
       <div style={cardWrap}>
-        <Card title="온도" value={`${latest.temperature} °C`} />
-        <Card title="습도" value={`${latest.humidity} %`} />
-        <Card title="상태" value="LIVE" />
+        <Card
+          title="온도"
+          value={latest ? `${latest.temperature} °C` : '--'}
+        />
+        <Card
+          title="습도"
+          value={latest ? `${latest.humidity} %` : '--'}
+        />
+        <Card
+          title="상태"
+          value={latest ? 'LIVE' : 'NO DATA'}
+        />
       </div>
 
-      {/* 날씨 */}
       <WeatherPanel />
 
       {/* 그래프 */}
       <div style={chartBox}>
         <h2>📈 실시간 그래프</h2>
-        <canvas ref={canvasRef} />
+
+        {history.length === 0 ? (
+          <p style={{ opacity: 0.6 }}>데이터 없음</p>
+        ) : (
+          <canvas ref={canvasRef} />
+        )}
       </div>
 
-      {/* 제어 */}
       <ControlPanel />
     </div>
   );
