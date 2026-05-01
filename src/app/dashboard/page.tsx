@@ -1,67 +1,65 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
 
 export default function Dashboard() {
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data } = await supabase
+        .from('sensor_readings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0) {
+        setData(data[0]);
+      }
+    };
+
+    fetchData();
+    const interval = setInterval(fetchData, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div style={container}>
       <h1 style={title}>🌱 스마트팜 대시보드</h1>
 
-      <p style={desc}>
-        시스템 연결 정상 / 라우팅 정상 확인 완료
-      </p>
-
       <div style={cardWrap}>
-        <div style={card}>
-          <h3>온도</h3>
-          <p style={value}>-- °C</p>
-        </div>
-
-        <div style={card}>
-          <h3>습도</h3>
-          <p style={value}>-- %</p>
-        </div>
-
-        <div style={card}>
-          <h3>상태</h3>
-          <p style={value}>READY</p>
-        </div>
-      </div>
-
-      <div style={nav}>
-        <Link href="/" style={btn}>
-          ⬅ 홈으로
-        </Link>
+        <Card title="온도" value={`${data?.temperature ?? '--'} °C`} />
+        <Card title="습도" value={`${data?.humidity ?? '--'} %`} />
+        <Card title="상태" value={data ? 'LIVE' : 'READY'} />
       </div>
     </div>
   );
 }
 
-// ===== 스타일 =====
+function Card({ title, value }: any) {
+  return (
+    <div style={card}>
+      <h3>{title}</h3>
+      <p style={valueStyle}>{value}</p>
+    </div>
+  );
+}
+
+// 스타일 그대로 유지
 const container = {
   padding: '40px',
   background: '#0f172a',
   minHeight: '100vh',
   color: 'white',
-  fontFamily: 'sans-serif',
 };
 
-const title = {
-  fontSize: '32px',
-  marginBottom: '10px',
-};
-
-const desc = {
-  marginBottom: '30px',
-  color: '#94a3b8',
-};
+const title = { marginBottom: '20px' };
 
 const cardWrap = {
   display: 'flex',
   gap: '16px',
-  marginBottom: '30px',
 };
 
 const card = {
@@ -72,20 +70,7 @@ const card = {
   textAlign: 'center' as const,
 };
 
-const value = {
+const valueStyle = {
   fontSize: '28px',
-  fontWeight: 'bold',
-};
-
-const nav = {
-  marginTop: '20px',
-};
-
-const btn = {
-  padding: '10px 18px',
-  background: '#22c55e',
-  borderRadius: '8px',
-  color: 'white',
-  textDecoration: 'none',
   fontWeight: 'bold',
 };
