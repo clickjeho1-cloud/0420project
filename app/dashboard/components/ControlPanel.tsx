@@ -2,15 +2,15 @@
 
 export default function ControlPanel() {
   const send = async (cmd: string) => {
-    await fetch('/api/mqtt', {
+    await fetch('/api/control', {
       method: 'POST',
       body: JSON.stringify({ cmd }),
     });
   };
 
   return (
-    <div>
-      <h3>🎮 장비 제어</h3>
+    <div style={{ marginTop: 20 }}>
+      <h3>🎮 제어</h3>
 
       <button onClick={() => send('PUMP_ON')}>펌프 ON</button>
       <button onClick={() => send('PUMP_OFF')}>펌프 OFF</button>
