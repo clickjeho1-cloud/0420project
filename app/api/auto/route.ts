@@ -3,46 +3,38 @@ import mqtt from 'mqtt';
 
 const client = mqtt.connect('mqtt://broker.hivemq.com');
 
-// PID 파라미터 (나중에 UI에서 조절 가능)
-let Kp = 1.5;
-let Ki = 0.05;
-let Kd = 0.2;
-
-let prevError = 0;
-let integral = 0;
-
 export async function POST(req: Request) {
-  const { temperature } = await req.json();
+  const body = await req.json();
 
-  const setpoint = 25;
+  const { temperature, humidity } = body;
 
-  const error = setpoint - temperature;
-
-  integral += error;
-  const derivative = error - prevError;
-
-  const output = Kp * error + Ki * integral + Kd * derivative;
-
-  prevError = error;
-
-  // 🔥 출력 → 팬 제어로 연결
-  const pwm = Math.max(0, Math.min(100, output));
-
-  const cmd = {
+  let command: any = {
     farm_id: "greenhouse01",
     cmd_type: "manual",
-    devices: {
-      fan: { pwm }
-    }
+    devices: {}
   };
 
+  // 🔥 위험 판단
+  if (temperature > 30) {
+    command.devices.fan = { pwm: 80 };
+  }
+
+  if (temperature < 18) {
+    command.devices.heater = { on: true };
+  }
+
+  if (humidity < 40) {
+    command.devices.pump = { on: true, duration_sec: 30 };
+  }
+
+  // 🔥 MQTT 전송
   client.publish(
-    'smartfarm/greenhouse01/ctrl',
-    JSON.stringify(cmd)
+    'smartfarm/greenhouse01/control',
+    JSON.stringify(command)
   );
 
   return NextResponse.json({
     ok: true,
-    pid: { error, integral, derivative, output }
+    command
   });
 }

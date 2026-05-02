@@ -1,22 +1,32 @@
 'use client';
 
-export default function ControlPanel() {
-  const send = async (cmd: string) => {
+type Props = {
+  latest: any;
+};
+
+export default function ControlPanel({ latest }: Props) {
+
+  const sendManual = async () => {
+    if (!latest) return;
+
     await fetch('/api/control', {
       method: 'POST',
-      body: JSON.stringify({ cmd }),
+      body: JSON.stringify({
+        cmd_type: 'manual',
+        devices: {
+          fan: { pwm: 50 },
+        },
+      }),
     });
   };
 
   return (
-    <div style={{ marginTop: 20 }}>
+    <div>
       <h3>🎮 제어</h3>
 
-      <button onClick={() => send('PUMP_ON')}>펌프 ON</button>
-      <button onClick={() => send('PUMP_OFF')}>펌프 OFF</button>
-
-      <button onClick={() => send('FAN_ON')}>팬 ON</button>
-      <button onClick={() => send('FAN_OFF')}>팬 OFF</button>
+      <button onClick={sendManual}>
+        팬 50% 실행
+      </button>
     </div>
   );
 }

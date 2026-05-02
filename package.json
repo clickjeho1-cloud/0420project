@@ -16,6 +16,7 @@
     "assert": "^2.1.0",
     "buffer": "^6.0.3",
     "chart.js": "^4.5.1",
+    "chartjs-plugin-annotation": "^3.1.0",
     "events": "^3.3.0",
     "mqtt": "^5.15.1",
     "next": "14.2.18",

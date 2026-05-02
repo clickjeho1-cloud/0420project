@@ -5,26 +5,33 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-import ChartPanel from './components/ChartPanel';
+import PIDChart from './components/PIDChart';
+import IntegralChart from './components/IntegralChart';
+import OutputChart from './components/OutputChart';
+
 import AlertPanel from './components/AlertPanel';
 import ControlPanel from './components/ControlPanel';
 import WeatherPanel from './components/WeatherPanel';
 
 export default function Dashboard() {
   const [latest, setLatest] = useState<any>(null);
-  const [pidState, setPidState] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [autoStatus, setAutoStatus] = useState<any>(null);
 
   // 🔥 초기 데이터
   useEffect(() => {
     const load = async () => {
+      if (!supabase) return;
+
       const { data } = await supabase
         .from('sensor_readings')
         .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1);
+        .order('created_at', { ascending: true })
+        .limit(30);
 
-      if (data && data.length > 0) {
-        setLatest(data[0]);
+      if (data) {
+        setHistory(data);
+        setLatest(data[data.length - 1]);
       }
     };
 
@@ -33,6 +40,8 @@ export default function Dashboard() {
 
   // 🔥 실시간 데이터
   useEffect(() => {
+    if (!supabase) return;
+
     const channel = supabase
       .channel('live')
       .on(
@@ -44,32 +53,41 @@ export default function Dashboard() {
         },
         (payload) => {
           setLatest(payload.new);
+          setHistory(prev => [...prev.slice(-29), payload.new]);
         }
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      if (!supabase) return;
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  // 🔥 AI 자동제어 실행
-  const runAI = async () => {
+  // 🔥 자동제어 함수 (핵심)
+  const runAuto = async () => {
     if (!latest) return;
 
-    const res = await fetch('/api/ai', {
-      method: 'POST',
-      body: JSON.stringify({
-        temperature: latest.temperature,
-      }),
-    });
+    try {
+      const res = await fetch('/api/auto', {
+        method: 'POST',
+        body: JSON.stringify({
+          temperature: latest.temperature,
+          humidity: latest.humidity,
+        }),
+      });
 
-    const data = await res.json();
-    setPidState(data.pid);
+      const data = await res.json();
+      setAutoStatus(data.command);
+    } catch (e) {
+      console.error('auto error', e);
+    }
   };
 
-  // 🔥 자동 반복 (AI 루프)
+  // 🔥 자동 루프 (완전 자동 시스템)
   useEffect(() => {
     const t = setInterval(() => {
-      if (latest) runAI();
+      if (latest) runAuto();
     }, 5000);
 
     return () => clearInterval(t);
@@ -80,19 +98,39 @@ export default function Dashboard() {
 
       <WeatherPanel />
 
-      <h1>🌱 SMART FARM AI CONTROL</h1>
+      <h1>🌱 SMART FARM AUTO CONTROL</h1>
 
       {/* 상태 카드 */}
       <div className="card-wrap">
         <Card title="온도" value={latest ? `${latest.temperature} °C` : '--'} />
         <Card title="습도" value={latest ? `${latest.humidity} %` : '--'} />
-        <Card title="상태" value={latest ? 'LIVE' : 'NO DATA'} />
+        <Card title="상태" value={latest ? 'AUTO RUNNING' : 'NO DATA'} />
       </div>
 
-      {/* PID 그래프 */}
+      {/* 🔥 그래프 3개 */}
       <div className="section">
-        <h2>📈 PID 그래프</h2>
-        <ChartPanel />
+        <h2>📊 PID 분석</h2>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: '20px'
+        }}>
+          <div>
+            <h3>🎯 PID 상태</h3>
+            <PIDChart data={history} />
+          </div>
+
+          <div>
+            <h3>📈 적분 (I)</h3>
+            <IntegralChart data={history} />
+          </div>
+
+          <div>
+            <h3>⚡ 출력 & 변화</h3>
+            <OutputChart data={history} />
+          </div>
+        </div>
       </div>
 
       {/* 경고 */}
@@ -104,20 +142,16 @@ export default function Dashboard() {
       <div className="section">
         <ControlPanel latest={latest} />
 
-        <button onClick={runAI}>
-          🧠 AI 자동제어 실행
+        <button onClick={runAuto}>
+          ⚙️ 수동 자동제어 실행
         </button>
       </div>
 
-      {/* AI 상태 */}
-      {pidState && (
+      {/* 🔥 자동제어 상태 */}
+      {autoStatus && (
         <div className="section">
-          <h3>🧠 AI PID 상태</h3>
-          <p>Kp: {pidState.Kp.toFixed(2)}</p>
-          <p>Ki: {pidState.Ki.toFixed(2)}</p>
-          <p>Kd: {pidState.Kd.toFixed(2)}</p>
-          <p>Error: {pidState.error.toFixed(2)}</p>
-          <p>Output: {pidState.output.toFixed(2)}</p>
+          <h3>🤖 자동제어 실행 결과</h3>
+          <pre>{JSON.stringify(autoStatus, null, 2)}</pre>
         </div>
       )}
     </div>

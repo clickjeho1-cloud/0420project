@@ -13,6 +13,8 @@ export default function ChartPanel() {
   // 🔥 초기 데이터 로드
   useEffect(() => {
     const load = async () => {
+      if (!supabase) return; // ✅ 핵심
+
       const { data } = await supabase
         .from('sensor_readings')
         .select('*')
@@ -27,6 +29,8 @@ export default function ChartPanel() {
 
   // 🔥 실시간 구독
   useEffect(() => {
+    if (!supabase) return; // ✅ 핵심
+
     const channel = supabase
       .channel('realtime')
       .on(
@@ -43,15 +47,16 @@ export default function ChartPanel() {
       .subscribe();
 
     return () => {
+      if (!supabase) return; // ✅ 핵심 (마지막 에러 해결)
       supabase.removeChannel(channel);
     };
   }, []);
 
-  // 🔥 그래프 렌더
+  // 🔥 그래프 렌더링
   useEffect(() => {
     if (!ref.current || data.length === 0) return;
 
-    const t = data.map((_: any, i: number) => i);
+    const t = data.map((_, i) => i);
     const pv = data.map(d => d.temperature);
     const setpoint = t.map(() => 25);
 
@@ -61,7 +66,9 @@ export default function ChartPanel() {
     const I = error.map(e => Iacc += e * 0.1);
     const D = error.map((e, i) => i === 0 ? 0 : e - error[i - 1]);
 
-    if (chartRef.current) chartRef.current.destroy();
+    if (chartRef.current) {
+      chartRef.current.destroy();
+    }
 
     chartRef.current = new Chart(ref.current, {
       type: 'line',
@@ -71,15 +78,14 @@ export default function ChartPanel() {
           { label: 'Setpoint', data: setpoint, borderColor: 'red' },
           { label: 'PV', data: pv, borderColor: 'blue' },
           { label: 'Error', data: error, borderColor: 'orange' },
-          { label: 'I', data: I, borderColor: 'green' },
-          { label: 'D', data: D, borderColor: 'purple' },
+          { label: 'Integral', data: I, borderColor: 'green' },
+          { label: 'Derivative', data: D, borderColor: 'purple' },
         ],
       },
       options: {
-        animation: {
-          duration: 500,
-        }
-      }
+        animation: { duration: 500 },
+        responsive: true,
+      },
     });
 
   }, [data]);
