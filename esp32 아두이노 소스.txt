@@ -22,103 +22,144 @@ const char* topic_sub = "smartfarm/jeho123/control";
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
 
-// ===== EC / pH (아날로그) =====
-#define EC_PIN 34
-#define PH_PIN 35
-
 // ===== 핀 =====
 #define FAN_PIN 4
 #define PUMP_PIN 5
 #define LED_PIN 6
 #define HEATER_PIN 7
 
+// ===== PWM 채널 =====
+#define FAN_CH 0
+#define LED_CH 1
+#define HEATER_CH 2
+
+// ===== 상태 변수 🔥 추가 핵심
+bool fanState = false;
+bool pumpState = false;
+bool ledState = false;
+bool heaterState = false;
+
+// ===== 펌프 논블로킹 =====
+bool pumpRunning = false;
+unsigned long pumpStart = 0;
+unsigned long pumpDuration = 0;
+
 // ===== MQTT =====
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-// ===== 스케줄 =====
-struct Schedule {
-  int startH;
-  int startM;
-  int endH;
-  int endM;
-  bool active;
-};
-
-Schedule pumpSchedule = {8, 0, 9, 0, true};
-
 // ===== 장치 제어 =====
-void applyDevices(JsonObject devices) {
+void handleDevices(JsonObject devices) {
 
+  // FAN
   if (devices.containsKey("fan")) {
-    int pwm = devices["fan"]["pwm"];
-    ledcWrite(0, map(pwm, 0, 100, 0, 255));
+    int pwm = devices["fan"]["pwm"] | 0;
+    ledcWrite(FAN_CH, map(pwm, 0, 100, 0, 255));
+    fanState = pwm > 0;
   }
 
+  // PUMP
   if (devices.containsKey("pump")) {
-    bool on = devices["pump"]["on"];
-    digitalWrite(PUMP_PIN, on ? HIGH : LOW);
+    bool on = devices["pump"]["on"] | false;
+    int duration = devices["pump"]["duration_sec"] | 0;
+
+    if (on) {
+      digitalWrite(PUMP_PIN, HIGH);
+      pumpState = true;
+
+      if (duration > 0) {
+        pumpRunning = true;
+        pumpStart = millis();
+        pumpDuration = duration * 1000;
+      }
+    } else {
+      digitalWrite(PUMP_PIN, LOW);
+      pumpState = false;
+      pumpRunning = false;
+    }
   }
 
+  // LED
   if (devices.containsKey("led")) {
-    int pwm = devices["led"]["pwm"];
-    ledcWrite(1, map(pwm, 0, 100, 0, 255));
+    int pwm = devices["led"]["pwm"] | 0;
+    ledcWrite(LED_CH, map(pwm, 0, 100, 0, 255));
+    ledState = pwm > 0;
   }
 
+  // HEATER
   if (devices.containsKey("heater")) {
-    bool on = devices["heater"]["on"];
-    digitalWrite(HEATER_PIN, on);
+    bool on = devices["heater"]["on"] | false;
+    ledcWrite(HEATER_CH, on ? 255 : 0);
+    heaterState = on;
   }
 }
 
-// ===== MQTT =====
+// ===== MQTT 수신 =====
 void callback(char* topic, byte* payload, unsigned int length) {
 
   StaticJsonDocument<512> doc;
-  deserializeJson(doc, payload, length);
+  DeserializationError err = deserializeJson(doc, payload, length);
 
-  String cmd = doc["cmd_type"];
-
-  if (cmd == "manual" || cmd == "auto") {
-    applyDevices(doc["devices"]);
+  if (err) {
+    Serial.println("JSON parse error");
+    return;
   }
 
-  // ===== schedule 등록 =====
-  if (cmd == "schedule") {
-    pumpSchedule.startH = doc["start_hour"];
-    pumpSchedule.startM = doc["start_min"];
-    pumpSchedule.endH = doc["end_hour"];
-    pumpSchedule.endM = doc["end_min"];
+  const char* cmd = doc["cmd_type"];
+
+  if (cmd && strcmp(cmd, "manual") == 0) {
+    JsonObject devices = doc["devices"];
+    handleDevices(devices);
+    Serial.println("CMD APPLIED");
   }
 }
 
-// ===== WiFi + MQTT =====
+// ===== MQTT 재연결 =====
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("MQTT connecting...");
+
+    if (client.connect("esp32_client", mqtt_user, mqtt_pass)) {
+      Serial.println("OK");
+      client.subscribe(topic_sub);
+    } else {
+      Serial.print("FAIL: ");
+      Serial.println(client.state());
+      delay(2000);
+    }
+  }
+}
+
+// ===== SETUP =====
 void setup() {
   Serial.begin(115200);
 
   pinMode(PUMP_PIN, OUTPUT);
-  pinMode(HEATER_PIN, OUTPUT);
 
-  ledcSetup(0, 5000, 8);
-  ledcAttachPin(FAN_PIN, 0);
+  // PWM 설정
+  ledcSetup(FAN_CH, 5000, 8);
+  ledcAttachPin(FAN_PIN, FAN_CH);
 
-  ledcSetup(1, 5000, 8);
-  ledcAttachPin(LED_PIN, 1);
+  ledcSetup(LED_CH, 5000, 8);
+  ledcAttachPin(LED_PIN, LED_CH);
 
+  ledcSetup(HEATER_CH, 5000, 8);
+  ledcAttachPin(HEATER_PIN, HEATER_CH);
+
+  // WiFi 연결
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) delay(500);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi connected");
 
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 
   dht.begin();
-}
-
-void reconnect() {
-  while (!client.connected()) {
-    client.connect("esp32", mqtt_user, mqtt_pass);
-    client.subscribe(topic_sub);
-  }
 }
 
 // ===== LOOP =====
@@ -127,28 +168,40 @@ void loop() {
   if (!client.connected()) reconnect();
   client.loop();
 
-  // ===== 센서 =====
-  float temp = dht.readTemperature();
-  float hum = dht.readHumidity();
+  // ===== 펌프 자동 종료 =====
+  if (pumpRunning && millis() - pumpStart > pumpDuration) {
+    digitalWrite(PUMP_PIN, LOW);
+    pumpRunning = false;
+    pumpState = false;
+  }
 
-  int ec_raw = analogRead(EC_PIN);
-  int ph_raw = analogRead(PH_PIN);
+  static unsigned long lastTime = 0;
 
-  float ec = ec_raw * 0.01;
-  float ph = ph_raw * 0.01;
+  if (millis() - lastTime > 2000) {
+    lastTime = millis();
 
-  // ===== JSON 송신 =====
-  StaticJsonDocument<256> doc;
+    float temp = dht.readTemperature();
+    float hum = dht.readHumidity();
 
-  doc["temperature"] = temp;
-  doc["humidity"] = hum;
-  doc["ec"] = ec;
-  doc["ph"] = ph;
+    if (isnan(temp) || isnan(hum)) return;
 
-  char buf[256];
-  serializeJson(doc, buf);
+    // ===== JSON 송신 (🔥 상태 포함) =====
+    StaticJsonDocument<256> doc;
 
-  client.publish(topic_pub, buf);
+    doc["temperature"] = temp;
+    doc["humidity"] = hum;
 
-  delay(2000);
+    // 🔥 장치 상태 포함
+    doc["fan"] = fanState;
+    doc["pump"] = pumpState;
+    doc["led"] = ledState;
+    doc["heater"] = heaterState;
+
+    char buffer[256];
+    serializeJson(doc, buffer);
+
+    client.publish(topic_pub, buffer);
+
+    Serial.println(buffer);
+  }
 }
