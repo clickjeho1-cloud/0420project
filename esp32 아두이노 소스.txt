@@ -22,136 +22,103 @@ const char* topic_sub = "smartfarm/jeho123/control";
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
 
-// ===== PID =====
-float setpoint = 25.0;
-float Kp = 2.5;
-float Ki = 0.6;
-float Kd = 1.2;
-
-float e_prev = 0;
-float integral = 0;
+// ===== EC / pH (아날로그) =====
+#define EC_PIN 34
+#define PH_PIN 35
 
 // ===== 핀 =====
-const int fanPin = 4;
-const int pumpPin = 5;
-const int ledPin = 6;
-const int heaterPin = 7;
-
-// ===== PWM 채널 =====
-#define FAN_CH 0
-#define LED_CH 1
-#define HEATER_CH 2
-
-// ===== 펌프 논블로킹 =====
-bool pumpRunning = false;
-unsigned long pumpStart = 0;
-unsigned long pumpDuration = 0;
+#define FAN_PIN 4
+#define PUMP_PIN 5
+#define LED_PIN 6
+#define HEATER_PIN 7
 
 // ===== MQTT =====
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+// ===== 스케줄 =====
+struct Schedule {
+  int startH;
+  int startM;
+  int endH;
+  int endM;
+  bool active;
+};
+
+Schedule pumpSchedule = {8, 0, 9, 0, true};
+
 // ===== 장치 제어 =====
-void handleDevices(JsonObject devices) {
+void applyDevices(JsonObject devices) {
 
-  // FAN
   if (devices.containsKey("fan")) {
-    int pwm = devices["fan"]["pwm"] | 0;
-    ledcWrite(FAN_CH, map(pwm, 0, 100, 0, 255));
+    int pwm = devices["fan"]["pwm"];
+    ledcWrite(0, map(pwm, 0, 100, 0, 255));
   }
 
-  // PUMP
   if (devices.containsKey("pump")) {
-    bool on = devices["pump"]["on"] | false;
-    int duration = devices["pump"]["duration_sec"] | 0;
-
-    if (on) {
-      digitalWrite(pumpPin, HIGH);
-      pumpDuration = duration * 1000;
-      pumpStart = millis();
-      pumpRunning = true;
-    }
+    bool on = devices["pump"]["on"];
+    digitalWrite(PUMP_PIN, on ? HIGH : LOW);
   }
 
-  // LED
   if (devices.containsKey("led")) {
-    int pwm = devices["led"]["pwm"] | 0;
-    ledcWrite(LED_CH, map(pwm, 0, 100, 0, 255));
+    int pwm = devices["led"]["pwm"];
+    ledcWrite(1, map(pwm, 0, 100, 0, 255));
   }
 
-  // HEATER
   if (devices.containsKey("heater")) {
-    bool on = devices["heater"]["on"] | false;
-    ledcWrite(HEATER_CH, on ? 255 : 0);
+    bool on = devices["heater"]["on"];
+    digitalWrite(HEATER_PIN, on);
   }
 }
 
-// ===== MQTT 수신 =====
+// ===== MQTT =====
 void callback(char* topic, byte* payload, unsigned int length) {
 
   StaticJsonDocument<512> doc;
-  DeserializationError err = deserializeJson(doc, payload, length);
+  deserializeJson(doc, payload, length);
 
-  if (err) {
-    Serial.println("JSON parse error");
-    return;
+  String cmd = doc["cmd_type"];
+
+  if (cmd == "manual" || cmd == "auto") {
+    applyDevices(doc["devices"]);
   }
 
-  const char* cmd = doc["cmd_type"];
-
-  if (cmd && strcmp(cmd, "manual") == 0) {
-    JsonObject devices = doc["devices"];
-    handleDevices(devices);
-    Serial.println("CMD APPLIED");
-  }
-}
-
-// ===== MQTT 재연결 =====
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("MQTT connecting...");
-
-    if (client.connect("esp32_client", mqtt_user, mqtt_pass)) {
-      Serial.println("OK");
-      client.subscribe(topic_sub);
-    } else {
-      Serial.print("FAIL: ");
-      Serial.println(client.state());
-      delay(2000);
-    }
+  // ===== schedule 등록 =====
+  if (cmd == "schedule") {
+    pumpSchedule.startH = doc["start_hour"];
+    pumpSchedule.startM = doc["start_min"];
+    pumpSchedule.endH = doc["end_hour"];
+    pumpSchedule.endM = doc["end_min"];
   }
 }
 
-// ===== SETUP =====
+// ===== WiFi + MQTT =====
 void setup() {
   Serial.begin(115200);
 
-  pinMode(pumpPin, OUTPUT);
+  pinMode(PUMP_PIN, OUTPUT);
+  pinMode(HEATER_PIN, OUTPUT);
 
-  // PWM 설정
-  ledcSetup(FAN_CH, 5000, 8);
-  ledcAttachPin(fanPin, FAN_CH);
+  ledcSetup(0, 5000, 8);
+  ledcAttachPin(FAN_PIN, 0);
 
-  ledcSetup(LED_CH, 5000, 8);
-  ledcAttachPin(ledPin, LED_CH);
+  ledcSetup(1, 5000, 8);
+  ledcAttachPin(LED_PIN, 1);
 
-  ledcSetup(HEATER_CH, 5000, 8);
-  ledcAttachPin(heaterPin, HEATER_CH);
-
-  // WiFi 연결
   WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("\nWiFi connected");
+  while (WiFi.status() != WL_CONNECTED) delay(500);
 
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 
   dht.begin();
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    client.connect("esp32", mqtt_user, mqtt_pass);
+    client.subscribe(topic_sub);
+  }
 }
 
 // ===== LOOP =====
@@ -160,56 +127,28 @@ void loop() {
   if (!client.connected()) reconnect();
   client.loop();
 
-  // ===== 펌프 종료 =====
-  if (pumpRunning && millis() - pumpStart > pumpDuration) {
-    digitalWrite(pumpPin, LOW);
-    pumpRunning = false;
-  }
+  // ===== 센서 =====
+  float temp = dht.readTemperature();
+  float hum = dht.readHumidity();
 
-  static unsigned long lastTime = 0;
+  int ec_raw = analogRead(EC_PIN);
+  int ph_raw = analogRead(PH_PIN);
 
-  if (millis() - lastTime > 1000) {
-    lastTime = millis();
+  float ec = ec_raw * 0.01;
+  float ph = ph_raw * 0.01;
 
-    float temp = dht.readTemperature();
-    if (isnan(temp)) return;
+  // ===== JSON 송신 =====
+  StaticJsonDocument<256> doc;
 
-    // ===== PID =====
-    float error = setpoint - temp;
-    integral += error;
+  doc["temperature"] = temp;
+  doc["humidity"] = hum;
+  doc["ec"] = ec;
+  doc["ph"] = ph;
 
-    // anti-windup
-    if (integral > 100) integral = 100;
-    if (integral < -100) integral = -100;
+  char buf[256];
+  serializeJson(doc, buf);
 
-    float derivative = error - e_prev;
+  client.publish(topic_pub, buf);
 
-    float output = Kp * error + Ki * integral + Kd * derivative;
-
-    if (output > 255) output = 255;
-    if (output < 0) output = 0;
-
-    e_prev = error;
-
-    // ===== JSON 송신 =====
-    StaticJsonDocument<256> doc;
-    doc["time"] = millis();
-
-    JsonObject v = doc.createNestedObject("values");
-    v["temperature"] = temp;
-    v["error"] = error;
-    v["integral"] = integral;
-    v["derivative"] = derivative;
-    v["output"] = output;
-
-    char buffer[256];
-    serializeJson(doc, buffer);
-
-    client.publish(topic_pub, buffer);
-
-    Serial.println(buffer);
-
-    // ===== 히터 제어 =====
-    ledcWrite(HEATER_CH, (int)output);
-  }
+  delay(2000);
 }

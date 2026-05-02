@@ -5,20 +5,11 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-import PIDChart from './components/PIDChart';
-import IntegralChart from './components/IntegralChart';
-import OutputChart from './components/OutputChart';
-
-import AlertPanel from './components/AlertPanel';
-import ControlPanel from './components/ControlPanel';
-import WeatherPanel from './components/WeatherPanel';
-
 export default function Dashboard() {
-  const [latest, setLatest] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [autoStatus, setAutoStatus] = useState<any>(null);
 
-  // 🔥 초기 데이터
+  const [latest, setLatest] = useState<any>(null);
+
+  // 🔥 데이터 로딩
   useEffect(() => {
     const load = async () => {
       if (!supabase) return;
@@ -26,19 +17,18 @@ export default function Dashboard() {
       const { data } = await supabase
         .from('sensor_readings')
         .select('*')
-        .order('created_at', { ascending: true })
-        .limit(30);
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-      if (data) {
-        setHistory(data);
-        setLatest(data[data.length - 1]);
+      if (data && data.length > 0) {
+        setLatest(data[0]);
       }
     };
 
     load();
   }, []);
 
-  // 🔥 실시간 데이터
+  // 🔥 실시간 수신
   useEffect(() => {
     if (!supabase) return;
 
@@ -53,7 +43,6 @@ export default function Dashboard() {
         },
         (payload) => {
           setLatest(payload.new);
-          setHistory(prev => [...prev.slice(-29), payload.new]);
         }
       )
       .subscribe();
@@ -64,27 +53,18 @@ export default function Dashboard() {
     };
   }, []);
 
-  // 🔥 자동제어 함수 (핵심)
+  // 🔥 자동제어 (AI)
   const runAuto = async () => {
     if (!latest) return;
 
-    try {
-      const res = await fetch('/api/auto', {
-        method: 'POST',
-        body: JSON.stringify({
-          temperature: latest.temperature,
-          humidity: latest.humidity,
-        }),
-      });
-
-      const data = await res.json();
-      setAutoStatus(data.command);
-    } catch (e) {
-      console.error('auto error', e);
-    }
+    await fetch('/api/auto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(latest),
+    });
   };
 
-  // 🔥 자동 루프 (완전 자동 시스템)
+  // 🔥 자동 루프 (5초마다)
   useEffect(() => {
     const t = setInterval(() => {
       if (latest) runAuto();
@@ -93,77 +73,40 @@ export default function Dashboard() {
     return () => clearInterval(t);
   }, [latest]);
 
+  // 🔥 스케줄 실행 (예: 오전 8시~9시)
+  const runSchedule = async () => {
+    await fetch('/api/schedule', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_hour: 8,
+        start_min: 0,
+        end_hour: 9,
+        end_min: 0
+      }),
+    });
+  };
+
   return (
-    <div className="container fade-in">
+    <div style={{ padding: 20 }}>
 
-      <WeatherPanel />
+      <h1>🌱 SMART FARM SYSTEM</h1>
 
-      <h1>🌱 SMART FARM AUTO CONTROL</h1>
+      <p>온도: {latest?.temperature ?? '--'}</p>
+      <p>습도: {latest?.humidity ?? '--'}</p>
+      <p>EC: {latest?.ec ?? '--'}</p>
+      <p>pH: {latest?.ph ?? '--'}</p>
 
-      {/* 상태 카드 */}
-      <div className="card-wrap">
-        <Card title="온도" value={latest ? `${latest.temperature} °C` : '--'} />
-        <Card title="습도" value={latest ? `${latest.humidity} %` : '--'} />
-        <Card title="상태" value={latest ? 'AUTO RUNNING' : 'NO DATA'} />
-      </div>
+      <hr />
 
-      {/* 🔥 그래프 3개 */}
-      <div className="section">
-        <h2>📊 PID 분석</h2>
+      <button onClick={runAuto}>
+        🤖 자동제어 실행
+      </button>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '20px'
-        }}>
-          <div>
-            <h3>🎯 PID 상태</h3>
-            <PIDChart data={history} />
-          </div>
+      <button onClick={runSchedule}>
+        ⏱ 스케줄 실행
+      </button>
 
-          <div>
-            <h3>📈 적분 (I)</h3>
-            <IntegralChart data={history} />
-          </div>
-
-          <div>
-            <h3>⚡ 출력 & 변화</h3>
-            <OutputChart data={history} />
-          </div>
-        </div>
-      </div>
-
-      {/* 경고 */}
-      <div className="section">
-        <AlertPanel data={latest} />
-      </div>
-
-      {/* 제어 */}
-      <div className="section">
-        <ControlPanel latest={latest} />
-
-        <button onClick={runAuto}>
-          ⚙️ 수동 자동제어 실행
-        </button>
-      </div>
-
-      {/* 🔥 자동제어 상태 */}
-      {autoStatus && (
-        <div className="section">
-          <h3>🤖 자동제어 실행 결과</h3>
-          <pre>{JSON.stringify(autoStatus, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// 카드 컴포넌트
-function Card({ title, value }: any) {
-  return (
-    <div className="card">
-      <h3>{title}</h3>
-      <p className="card-value">{value}</p>
     </div>
   );
 }

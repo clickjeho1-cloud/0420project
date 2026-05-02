@@ -6,35 +6,24 @@ const client = mqtt.connect('mqtt://broker.hivemq.com');
 export async function POST(req: Request) {
   const body = await req.json();
 
-  const { temperature, humidity } = body;
+  const { temperature, humidity, ec, ph } = body;
 
-  let command: any = {
-    farm_id: "greenhouse01",
-    cmd_type: "manual",
-    devices: {}
-  };
+  let devices: any = {};
 
-  // 🔥 위험 판단
-  if (temperature > 30) {
-    command.devices.fan = { pwm: 80 };
-  }
+  if (temperature > 30) devices.fan = { pwm: 80 };
+  if (temperature < 18) devices.heater = { on: true };
 
-  if (temperature < 18) {
-    command.devices.heater = { on: true };
-  }
+  if (humidity < 40) devices.pump = { on: true };
 
-  if (humidity < 40) {
-    command.devices.pump = { on: true, duration_sec: 30 };
-  }
+  if (ec < 1.2) devices.pump = { on: true };
+  if (ph > 7.0) devices.pump = { on: true };
 
-  // 🔥 MQTT 전송
-  client.publish(
-    'smartfarm/greenhouse01/control',
-    JSON.stringify(command)
+  client.publish('smartfarm/jeho123/control',
+    JSON.stringify({
+      cmd_type: 'auto',
+      devices
+    })
   );
 
-  return NextResponse.json({
-    ok: true,
-    command
-  });
+  return NextResponse.json({ ok: true, devices });
 }
