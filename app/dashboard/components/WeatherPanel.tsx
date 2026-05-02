@@ -7,21 +7,35 @@ export default function WeatherPanel() {
 
   useEffect(() => {
     const load = async () => {
-      const res = await fetch(
-        'https://api.open-meteo.com/v1/forecast?latitude=37.57&longitude=126.98&current_weather=true'
-      );
-      const json = await res.json();
-      setWeather(json.current_weather);
+      try {
+        const res = await fetch(
+          'https://api.open-meteo.com/v1/forecast?latitude=37.57&longitude=126.98&current_weather=true'
+        );
+        const data = await res.json();
+        setWeather(data.current_weather);
+      } catch (e) {
+        console.error('weather error', e);
+      }
     };
 
     load();
+    const t = setInterval(load, 600000); // 10분 갱신
+
+    return () => clearInterval(t);
   }, []);
 
   return (
-    <div>
-      <h3>🌦 외부 날씨</h3>
-      <p>온도: {weather?.temperature} °C</p>
-      <p>풍속: {weather?.windspeed}</p>
+    <div className="weather-box">
+      <h4>🌦 외부 날씨</h4>
+
+      {weather ? (
+        <>
+          <p>{weather.temperature}°C</p>
+          <p>풍속 {weather.windspeed} km/h</p>
+        </>
+      ) : (
+        <p>불러오는 중...</p>
+      )}
     </div>
   );
 }

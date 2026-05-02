@@ -1,0 +1,26 @@
+git add .
+git commit -m "update"
+git push  ///
+업로드시 배포시 필수 명령 윈도우에 파워셀에서
+
+git push -f origin main  다음 명령 줄
+
+
+문제	원인
+404	src/app vs app 충돌
+해결	app만 사용
+
+///
+
+git add .
+git commit -m "fix vercel routing"
+git push -f origin main
+
+vercel Project Settings → Root Directory 설정
+
+src==.
+
+//
+git add .
+git commit -m "fix supabase api key"
+git push -f origin main  
