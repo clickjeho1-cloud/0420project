@@ -1,41 +1,67 @@
 'use client';
 
-type Props = {
-  latest: any;
-};
-
-export default function ControlPanel({ latest }: Props) {
+export default function ControlPanel() {
 
   const send = async (devices: any) => {
     await fetch('/api/control', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, // 🔥 중요
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        cmd_type: 'manual',   // 🔥 반드시 포함
+        cmd_type: 'manual',
         devices
       }),
     });
   };
 
   return (
-    <div>
+    <div className="control-panel">
 
-      <h3>🎮 장치 제어</h3>
+      <h3>🎮 수동 제어</h3>
 
-      <button onClick={() => send({ fan: { pwm: 80 } })}>
-        🌀 팬 80%
-      </button>
+      <div className="control-grid">
 
-      <button onClick={() => send({ pump: { on: true, duration_sec: 30 } })}>
-        💧 펌프 30초
-      </button>
+        {/* 팬 */}
+        <div>
+          <p>🌀 팬</p>
+          <button onClick={() => send({ fan: { pwm: 80 } })}>ON</button>
+          <button onClick={() => send({ fan: { pwm: 0 } })}>OFF</button>
+        </div>
 
-      <button onClick={() => send({ led: { pwm: 100 } })}>
-        💡 LED ON
-      </button>
+        {/* 펌프 */}
+        <div>
+          <p>💧 펌프</p>
+          <button onClick={() => send({ pump: { on: true, duration_sec: 30 } })}>ON</button>
+          <button onClick={() => send({ pump: { on: false } })}>OFF</button>
+        </div>
 
-      <button onClick={() => send({ heater: { on: true } })}>
-        🔥 히터 ON
+        {/* LED */}
+        <div>
+          <p>💡 LED</p>
+          <button onClick={() => send({ led: { pwm: 100 } })}>ON</button>
+          <button onClick={() => send({ led: { pwm: 0 } })}>OFF</button>
+        </div>
+
+        {/* 히터 */}
+        <div>
+          <p>🔥 히터</p>
+          <button onClick={() => send({ heater: { on: true } })}>ON</button>
+          <button onClick={() => send({ heater: { on: false } })}>OFF</button>
+        </div>
+
+      </div>
+
+      <hr />
+
+      <h3>🤖 자동 제어</h3>
+      <button
+        onClick={() => {
+          fetch('/api/auto', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }}
+      >
+        자동제어 실행
       </button>
 
     </div>
