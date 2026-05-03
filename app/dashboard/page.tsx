@@ -6,12 +6,12 @@ import { useEffect, useState } from 'react';
 
 import {
   ResponsiveContainer,
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
+  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
-  CartesianGrid,
 } from 'recharts';
 
 type SensorData = {
@@ -23,11 +23,12 @@ type SensorData = {
   lux: number;
 };
 
-type DeviceState = {
-  fan: boolean;
-  pump: boolean;
-  led: boolean;
-  heater: boolean;
+type WeatherData = {
+  city: string;
+  condition: string;
+  temp: string;
+  humidity: string;
+  wind: string;
 };
 
 type HistoryData = {
@@ -37,47 +38,37 @@ type HistoryData = {
   ec: number;
   ph: number;
   waterTemp: number;
-  lux: number;
 };
 
 export default function DashboardPage() {
+
   const [time, setTime] =
     useState('');
 
-  const [historyRange, setHistoryRange] =
-    useState('1H');
-
   const [weather, setWeather] =
-    useState({
-      city: 'GPS 확인중...',
-      condition: '연결중...',
+    useState<WeatherData>({
+      city: '서울',
+      condition: '불러오는 중...',
       temp: '--',
+      humidity: '--',
       wind: '--',
-      rain: '--',
     });
 
   const [sensors, setSensors] =
     useState<SensorData>({
-      temperature: 23,
-      humidity: 61,
-      ec: 2.2,
+      temperature: 24,
+      humidity: 58,
+      ec: 2.3,
       ph: 6.1,
       waterTemp: 21,
-      lux: 28000,
-    });
-
-  const [devices, setDevices] =
-    useState<DeviceState>({
-      fan: false,
-      pump: true,
-      led: true,
-      heater: false,
+      lux: 32000,
     });
 
   const [history, setHistory] =
     useState<HistoryData[]>([]);
 
-  // 실시간 시계
+  // 실시간 시간
+
   useEffect(() => {
 
     const updateClock = () => {
@@ -122,28 +113,78 @@ export default function DashboardPage() {
 
   }, []);
 
-  // 실제 위치 기반 날씨
+  // 실시간 외부 기상 정보
+
   useEffect(() => {
 
-    navigator.geolocation.getCurrentPosition(
-      () => {
+    async function fetchWeather() {
 
-        // 실제 API 연결 자리
-        // 기상청 API / OpenWeather API 연결 가능
+      try {
+
+        const res =
+          await fetch(
+            '/api/weather',
+            {
+              cache:
+                'no-store',
+            }
+          );
+
+        const data =
+          await res.json();
 
         setWeather({
+
           city: '서울',
-          condition: '구름 많음',
-          temp: '14.2°C',
-          wind: '1.8m/s',
-          rain: '0mm',
+
+          condition:
+            '실시간 외부 환경',
+
+          temp:
+            `${data.temperature}°C`,
+
+          humidity:
+            data.humidity
+              ? `${data.humidity}%`
+              : '측정중',
+
+          wind:
+            `${data.windspeed} km/h`,
+        });
+
+      } catch {
+
+        setWeather({
+
+          city: '서울',
+
+          condition:
+            '기상 데이터 오류',
+
+          temp: '--',
+
+          humidity: '--',
+
+          wind: '--',
         });
       }
-    );
+    }
+
+    fetchWeather();
+
+    const interval =
+      setInterval(
+        fetchWeather,
+        60000
+      );
+
+    return () =>
+      clearInterval(interval);
 
   }, []);
 
-  // 실시간 센서 데이터
+  // 실시간 센서
+
   useEffect(() => {
 
     const interval =
@@ -155,7 +196,7 @@ export default function DashboardPage() {
             Number(
               (
                 20 +
-                Math.random() * 8
+                Math.random() * 7
               ).toFixed(1)
             ),
 
@@ -163,14 +204,14 @@ export default function DashboardPage() {
             Number(
               (
                 45 +
-                Math.random() * 30
+                Math.random() * 25
               ).toFixed(1)
             ),
 
           ec:
             Number(
               (
-                1.2 +
+                1.5 +
                 Math.random() * 2
               ).toFixed(1)
             ),
@@ -179,7 +220,7 @@ export default function DashboardPage() {
             Number(
               (
                 5.5 +
-                Math.random() * 1.5
+                Math.random() * 1
               ).toFixed(1)
             ),
 
@@ -187,14 +228,15 @@ export default function DashboardPage() {
             Number(
               (
                 18 +
-                Math.random() * 6
+                Math.random() * 5
               ).toFixed(1)
             ),
 
           lux:
             Math.floor(
               20000 +
-              Math.random() * 25000
+              Math.random() *
+                20000
             ),
         };
 
@@ -208,7 +250,7 @@ export default function DashboardPage() {
             time:
               new Date()
                 .toLocaleTimeString()
-                .slice(0, 8),
+                .slice(3, 8),
 
             temperature:
               data.temperature,
@@ -224,9 +266,6 @@ export default function DashboardPage() {
 
             waterTemp:
               data.waterTemp,
-
-            lux:
-              data.lux,
           },
         ]);
 
@@ -236,30 +275,6 @@ export default function DashboardPage() {
       clearInterval(interval);
 
   }, []);
-
-  const toggleDevice = (
-    key: keyof DeviceState,
-    value: boolean
-  ) => {
-
-    setDevices(prev => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  const avgTemp =
-    history.length > 0
-      ? (
-          history.reduce(
-            (a, b) =>
-              a +
-              b.temperature,
-            0
-          ) /
-          history.length
-        ).toFixed(1)
-      : 0;
 
   return (
 
@@ -273,85 +288,44 @@ export default function DashboardPage() {
         {time}
       </p>
 
-      {/* 실시간 환경 정보 */}
+      {/* 실시간 상황 */}
 
       <section className="panel">
 
         <h2>
-          실시간 환경 정보
+          실시간 상황 계기판
         </h2>
 
-        <div className="grid">
+        <div className="status-grid">
 
-          <InfoCard
-            title="지역"
-            value={weather.city}
-          />
-
-          <InfoCard
-            title="날씨"
-            value={
-              weather.condition
-            }
-          />
-
-          <InfoCard
-            title="외부온도"
+          <GlassCard
+            title="외부 온도"
             value={weather.temp}
           />
 
-          <InfoCard
+          <GlassCard
             title="풍속"
             value={weather.wind}
           />
 
-          <InfoCard
-            title="강수량"
-            value={weather.rain}
-          />
-
-        </div>
-
-      </section>
-
-      {/* 센서 */}
-
-      <section className="panel">
-
-        <h2>
-          실시간 센서 데이터
-        </h2>
-
-        <div className="grid">
-
-          <InfoCard
+          <GlassCard
             title="온도"
             value={`${sensors.temperature}°C`}
           />
 
-          <InfoCard
+          <GlassCard
             title="습도"
             value={`${sensors.humidity}%`}
           />
 
-          <InfoCard
+          <GlassCard
             title="EC"
             value={`${sensors.ec}`}
           />
 
-          <InfoCard
-            title="PH"
-            value={`${sensors.ph}`}
-          />
-
-          <InfoCard
-            title="양액온도"
-            value={`${sensors.waterTemp}°C`}
-          />
-
-          <InfoCard
+          <GlassCard
             title="광량"
-            value={`${sensors.lux} lux`}
+            value={`${sensors.lux}`}
           />
 
         </div>
@@ -363,13 +337,13 @@ export default function DashboardPage() {
       <section className="panel">
 
         <h2>
-          실시간 상황 계기판
+          실시간 원형 분석 계기판
         </h2>
 
         <div className="gauge-grid">
 
           <Gauge
-            title="Temperature"
+            title="TEMP"
             value={
               sensors.temperature
             }
@@ -378,7 +352,7 @@ export default function DashboardPage() {
           />
 
           <Gauge
-            title="Humidity"
+            title="HUMIDITY"
             value={
               sensors.humidity
             }
@@ -401,16 +375,7 @@ export default function DashboardPage() {
           />
 
           <Gauge
-            title="Water Temp"
-            value={
-              sensors.waterTemp
-            }
-            max={40}
-            unit="°C"
-          />
-
-          <Gauge
-            title="Light"
+            title="LIGHT"
             value={
               sensors.lux
             }
@@ -418,16 +383,25 @@ export default function DashboardPage() {
             unit="lux"
           />
 
+          <Gauge
+            title="WATER"
+            value={
+              sensors.waterTemp
+            }
+            max={40}
+            unit="°C"
+          />
+
         </div>
 
       </section>
 
-      {/* 파형 분석 */}
+      {/* 실시간 업다운 그래프 */}
 
       <section className="panel">
 
         <h2>
-          실시간 파형 분석 그래프
+          실시간 업다운 분석 그래프
         </h2>
 
         <ResponsiveContainer
@@ -435,12 +409,12 @@ export default function DashboardPage() {
           height={420}
         >
 
-          <LineChart
+          <AreaChart
             data={history}
           >
 
             <CartesianGrid
-              stroke="#1e293b"
+              stroke="#334155"
             />
 
             <XAxis
@@ -451,288 +425,217 @@ export default function DashboardPage() {
 
             <Tooltip />
 
-            <Line
+            <Area
               type="monotone"
               dataKey="temperature"
               stroke="#ff0000"
-              strokeWidth={3}
-              dot={false}
+              fill="#ff0000"
+              fillOpacity={0.15}
             />
 
-            <Line
+            <Area
               type="monotone"
               dataKey="humidity"
               stroke="#00ff00"
-              strokeWidth={3}
-              dot={false}
+              fill="#00ff00"
+              fillOpacity={0.15}
             />
 
-            <Line
+            <Area
               type="monotone"
               dataKey="ec"
               stroke="#00ccff"
-              strokeWidth={3}
-              dot={false}
+              fill="#00ccff"
+              fillOpacity={0.15}
             />
 
-            <Line
+            <Area
               type="monotone"
               dataKey="ph"
               stroke="#ffff00"
-              strokeWidth={3}
-              dot={false}
+              fill="#ffff00"
+              fillOpacity={0.15}
             />
 
-            <Line
+            <Area
               type="monotone"
               dataKey="waterTemp"
               stroke="#ff00ff"
-              strokeWidth={3}
-              dot={false}
+              fill="#ff00ff"
+              fillOpacity={0.15}
             />
 
-          </LineChart>
+          </AreaChart>
 
         </ResponsiveContainer>
-
-      </section>
-
-      {/* 히스토리 */}
-
-      <section className="panel">
-
-        <h2>
-          센서 히스토리
-        </h2>
-
-        <div className="history-buttons">
-
-          {[
-            '1H',
-            '8H',
-            '24H',
-            '7D',
-          ].map(range => (
-
-            <button
-              key={range}
-              onClick={() =>
-                setHistoryRange(
-                  range
-                )
-              }
-            >
-              {range}
-            </button>
-
-          ))}
-
-        </div>
-
-        <div className="stats">
-
-          <div className="stat-card">
-
-            최소 온도
-
-            <span>
-
-              {
-                history.length > 0
-                  ? Math.min(
-                      ...history.map(
-                        h =>
-                          h.temperature
-                      )
-                    )
-                  : 0
-              }
-
-              °C
-
-            </span>
-
-          </div>
-
-          <div className="stat-card">
-
-            최대 온도
-
-            <span>
-
-              {
-                history.length > 0
-                  ? Math.max(
-                      ...history.map(
-                        h =>
-                          h.temperature
-                      )
-                    )
-                  : 0
-              }
-
-              °C
-
-            </span>
-
-          </div>
-
-          <div className="stat-card">
-
-            평균 온도
-
-            <span>
-              {avgTemp}°C
-            </span>
-
-          </div>
-
-        </div>
-
-      </section>
-
-      {/* 제어 */}
-
-      <section className="panel">
-
-        <h2>
-          제어 시스템
-        </h2>
-
-        <div className="grid">
-
-          {(
-            [
-              'fan',
-              'pump',
-              'led',
-              'heater',
-            ] as (
-              keyof DeviceState
-            )[]
-          ).map(key => (
-
-            <div
-              key={key}
-              className="device"
-            >
-
-              <h3>
-                {key.toUpperCase()}
-              </h3>
-
-              <p className="status">
-
-                {devices[key]
-                  ? 'ON'
-                  : 'OFF'}
-
-              </p>
-
-              <div className="btns">
-
-                <button
-                  className="on"
-                  onClick={() =>
-                    toggleDevice(
-                      key,
-                      true
-                    )
-                  }
-                >
-                  ON
-                </button>
-
-                <button
-                  className="off"
-                  onClick={() =>
-                    toggleDevice(
-                      key,
-                      false
-                    )
-                  }
-                >
-                  OFF
-                </button>
-
-              </div>
-
-            </div>
-
-          ))}
-
-        </div>
 
       </section>
 
       <style jsx>{`
 
         .dashboard {
-          background: #020617;
-          color: white;
+
           min-height: 100vh;
+
+          background:
+            linear-gradient(
+              180deg,
+              #020617,
+              #0f172a
+            );
+
+          color: white;
+
           padding: 20px;
         }
 
         .title {
+
           font-size: 42px;
+
           color: #38bdf8;
+
+          margin-bottom: 10px;
         }
 
         .clock {
+
           color: #94a3b8;
+
           margin-bottom: 30px;
         }
 
         .panel {
-          background: #111827;
-          padding: 20px;
-          border-radius: 20px;
+
+          background:
+            rgba(
+              15,
+              23,
+              42,
+              0.82
+            );
+
+          backdrop-filter:
+            blur(12px);
+
+          border-radius: 24px;
+
+          padding: 25px;
+
           margin-bottom: 25px;
+
+          border:
+            1px solid rgba(
+              255,
+              255,
+              255,
+              0.06
+            );
+
+          box-shadow:
+            0 0 25px rgba(
+              0,
+              255,
+              255,
+              0.04
+            );
         }
 
-        .grid {
+        .status-grid {
+
           display: grid;
 
           grid-template-columns:
             repeat(
               auto-fit,
-              minmax(200px,1fr)
+              minmax(
+                220px,
+                1fr
+              )
             );
 
-          gap: 15px;
+          gap: 20px;
         }
 
-        .card,
-        .device {
-          background: #1e293b;
-          padding: 20px;
-          border-radius: 16px;
+        .glass-card {
+
+          background:
+            linear-gradient(
+              145deg,
+              rgba(
+                255,
+                255,
+                255,
+                0.08
+              ),
+              rgba(
+                255,
+                255,
+                255,
+                0.02
+              )
+            );
+
+          border-radius: 22px;
+
+          padding: 24px;
+
+          border:
+            1px solid rgba(
+              255,
+              255,
+              255,
+              0.05
+            );
+
+          box-shadow:
+            inset 0 0 20px rgba(
+              255,
+              255,
+              255,
+              0.03
+            );
         }
 
-        .value {
-          font-size: 28px;
-          margin-top: 10px;
+        .glass-value {
+
+          font-size: 34px;
+
+          margin-top: 14px;
+
           color: #22d3ee;
+
+          font-weight: bold;
         }
 
         .gauge-grid {
+
           display: grid;
 
           grid-template-columns:
             repeat(3,1fr);
 
-          gap: 20px;
+          gap: 24px;
         }
 
         .gauge-card {
-          background: #0f172a;
-          padding: 20px;
-          border-radius: 20px;
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.03
+            );
+
+          border-radius: 24px;
+
+          padding: 24px;
+
           text-align: center;
         }
 
-        .gauge-wrap {
+        .gauge-ring {
 
           width: 220px;
           height: 220px;
@@ -760,16 +663,24 @@ export default function DashboardPage() {
 
           align-items:
             center;
+
+          box-shadow:
+            0 0 30px rgba(
+              0,
+              255,
+              255,
+              0.25
+            );
         }
 
         .gauge-inner {
 
-          width: 180px;
-          height: 180px;
-
-          background: #020617;
+          width: 175px;
+          height: 175px;
 
           border-radius: 50%;
+
+          background: #020617;
 
           display: flex;
 
@@ -785,100 +696,14 @@ export default function DashboardPage() {
 
         .gauge-value {
 
-          font-size: 32px;
+          font-size: 34px;
 
           font-weight: bold;
         }
 
         .gauge-unit {
+
           color: #94a3b8;
-        }
-
-        .history-buttons {
-
-          display: flex;
-
-          gap: 10px;
-
-          margin-bottom: 20px;
-        }
-
-        .history-buttons button {
-
-          background: #1e293b;
-
-          border: none;
-
-          color: white;
-
-          padding: 10px 20px;
-
-          border-radius: 10px;
-        }
-
-        .stats {
-
-          display: flex;
-
-          gap: 20px;
-
-          margin-bottom: 20px;
-        }
-
-        .stat-card {
-
-          flex: 1;
-
-          background: #0f172a;
-
-          padding: 20px;
-
-          border-radius: 14px;
-        }
-
-        .stat-card span {
-
-          display: block;
-
-          margin-top: 10px;
-
-          font-size: 26px;
-
-          color: #22d3ee;
-        }
-
-        .btns {
-
-          display: flex;
-
-          gap: 10px;
-
-          margin-top: 10px;
-        }
-
-        button {
-
-          flex: 1;
-
-          border: none;
-
-          padding: 10px;
-
-          border-radius: 10px;
-
-          color: white;
-        }
-
-        .on {
-          background: green;
-        }
-
-        .off {
-          background: red;
-        }
-
-        .status {
-          font-size: 26px;
         }
 
       `}</style>
@@ -888,7 +713,7 @@ export default function DashboardPage() {
   );
 }
 
-function InfoCard({
+function GlassCard({
   title,
   value,
 }: {
@@ -898,11 +723,11 @@ function InfoCard({
 
   return (
 
-    <div className="card">
+    <div className="glass-card">
 
       <h3>{title}</h3>
 
-      <div className="value">
+      <div className="glass-value">
         {value}
       </div>
 
@@ -924,7 +749,10 @@ function Gauge({
 }) {
 
   const percent =
-    (value / max) * 100;
+    Math.min(
+      (value / max) * 100,
+      100
+    );
 
   return (
 
@@ -932,17 +760,18 @@ function Gauge({
 
       <h3>{title}</h3>
 
-      <div className="gauge-wrap">
+      <div
+        className="gauge-ring"
+        style={{
+          filter:
+            `brightness(${
+              0.5 +
+              percent / 100
+            })`,
+        }}
+      >
 
-        <div
-          className="gauge-inner"
-          style={{
-            boxShadow:
-              `0 0 ${
-                percent / 2
-              }px cyan`,
-          }}
-        >
+        <div className="gauge-inner">
 
           <div className="gauge-value">
             {value}
