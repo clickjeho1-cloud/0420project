@@ -1,443 +1,361 @@
+// app/dashboard/page.tsx
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabase';
 
-import ControlPanel from './components/ControlPanel';
-import SchedulePanel from './components/SchedulePanel';
-import LiveChart from './components/LiveChart';
+type SensorData = {
+  temperature: number;
+  humidity: number;
+  ec: number;
+  ph: number;
+  waterTemp: number;
+  waterLevel: number;
+  lux: number;
+};
 
-export default function Dashboard() {
+type DeviceState = {
+  fan: boolean;
+  pump: boolean;
+  led: boolean;
+  heater: boolean;
+};
 
-  const [latest, setLatest] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [now, setNow] = useState('');
+export default function DashboardPage() {
+  const [sensors, setSensors] = useState<SensorData>({
+    temperature: 0,
+    humidity: 0,
+    ec: 0,
+    ph: 0,
+    waterTemp: 0,
+    waterLevel: 0,
+    lux: 0,
+  });
 
-  // ===== 현재 시간 =====
+  const [devices, setDevices] = useState<DeviceState>({
+    fan: false,
+    pump: false,
+    led: false,
+    heater: false,
+  });
+
+  // 실시간 데이터 시뮬레이션
+  // 나중에 MQTT subscribe로 교체
   useEffect(() => {
+    const interval = setInterval(() => {
+      setSensors({
+        temperature: +(22 + Math.random() * 8).toFixed(1),
+        humidity: +(50 + Math.random() * 30).toFixed(1),
+        ec: +(1.5 + Math.random()).toFixed(2),
+        ph: +(5.5 + Math.random()).toFixed(2),
+        waterTemp: +(18 + Math.random() * 6).toFixed(1),
+        waterLevel: +(40 + Math.random() * 60).toFixed(0),
+        lux: Math.floor(10000 + Math.random() * 50000),
+      });
+    }, 2000);
 
-    const t = setInterval(() => {
-
-      const d = new Date();
-
-      const str =
-        d.toLocaleDateString() +
-        ' ' +
-        d.toLocaleTimeString();
-
-      setNow(str);
-
-    }, 1000);
-
-    return () => clearInterval(t);
-
+    return () => clearInterval(interval);
   }, []);
 
-  // ===== 초기 데이터 =====
-  useEffect(() => {
+  const toggleDevice = (
+    key: keyof DeviceState,
+    value: boolean
+  ) => {
+    setDevices((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
 
-    if (!supabase) return;
+    console.log('MQTT SEND:', {
+      device: key,
+      value,
+    });
 
-    const load = async () => {
+    // MQTT publish 예시
+    // client.publish(
+    //   'farm/control',
+    //   JSON.stringify({
+    //     device: key,
+    //     value,
+    //   })
+    // );
+  };
 
-      const { data } = await supabase
-        .from('sensor_readings')
-        .select('*')
-        .order('created_at', {
-          ascending: true
-        })
-        .limit(50);
-
-      if (!data) return;
-
-      setHistory(data);
-
-      if (data.length > 0) {
-        setLatest(data[data.length - 1]);
-      }
-
-    };
-
-    load();
-
-  }, []);
-
-  // ===== 실시간 =====
-  useEffect(() => {
-
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel('smartfarm-live')
-
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sensor_readings',
-        },
-
-        (payload) => {
-
-          const row = payload.new;
-
-          setLatest(row);
-
-          setHistory(prev => [
-
-            ...prev.slice(-49),
-
-            row
-
-          ]);
-
-        }
-      )
-
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-
-  }, []);
+  const deviceKeys: (keyof DeviceState)[] = [
+    'fan',
+    'pump',
+    'led',
+    'heater',
+  ];
 
   return (
+    <div className="dashboard">
+      <h1 className="main-title">
+        스마트팜 양액 시스템
+      </h1>
 
-    <div className="dash">
+      {/* 센서 패널 */}
+      <div className="sensor-grid">
+        <Card title="온도" value={`${sensors.temperature} °C`} />
+        <Card title="습도" value={`${sensors.humidity} %`} />
+        <Card title="EC" value={`${sensors.ec} ds/m`} />
+        <Card title="pH" value={`${sensors.ph}`} />
+        <Card title="양액 온도" value={`${sensors.waterTemp} °C`} />
+        <Card title="수위" value={`${sensors.waterLevel} %`} />
+        <Card title="광량" value={`${sensors.lux} lux`} />
+      </div>
 
-      {/* ===== 상단 ===== */}
+      {/* 양액 상태 */}
+      <div className="nutrient-panel">
+        <h2>양액 시스템 상태</h2>
 
-      <div className="header-row">
+        <div className="status-grid">
+          <StatusBox
+            label="EC 상태"
+            value={
+              sensors.ec >= 1.8
+                ? '정상'
+                : '낮음'
+            }
+          />
 
-        <h1>
-          🌱 SMART FARM SYSTEM
-        </h1>
+          <StatusBox
+            label="pH 상태"
+            value={
+              sensors.ph >= 5.5 &&
+              sensors.ph <= 6.5
+                ? '정상'
+                : '주의'
+            }
+          />
 
-        <div className="clock-box">
-          {now}
+          <StatusBox
+            label="물탱크"
+            value={
+              sensors.waterLevel < 20
+                ? '부족'
+                : '정상'
+            }
+          />
         </div>
-
       </div>
 
-      {/* ===== 상태 카드 ===== */}
+      {/* 장치 제어 */}
+      <div className="control-panel">
+        <h2>장치 제어</h2>
 
-      <div className="top-grid">
+        <div className="control-grid">
+          {deviceKeys.map((key) => (
+            <div
+              key={key}
+              className="control-card"
+            >
+              <h3>{key.toUpperCase()}</h3>
 
-        <Stat
-          title="온실온도"
-          value={latest?.temperature}
-          unit="°C"
-        />
+              <p
+                className={
+                  devices[key]
+                    ? 'on-text'
+                    : 'off-text'
+                }
+              >
+                {devices[key]
+                  ? 'ON'
+                  : 'OFF'}
+              </p>
 
-        <Stat
-          title="습도"
-          value={latest?.humidity}
-          unit="%"
-        />
+              <div className="btn-group">
+                <button
+                  className="on-btn"
+                  onClick={() =>
+                    toggleDevice(key, true)
+                  }
+                >
+                  ON
+                </button>
 
-        <Stat
-          title="광량"
-          value={latest?.light ?? 1800}
-          unit="lux"
-        />
-
-        <Stat
-          title="CO2"
-          value={latest?.co2 ?? 500}
-          unit="ppm"
-        />
-
-      </div>
-
-      {/* ===== 원형 게이지 ===== */}
-
-      <div className="gauge-grid">
-
-        <Gauge
-          label="온도"
-          value={latest?.temperature ?? 0}
-          max={50}
-        />
-
-        <Gauge
-          label="습도"
-          value={latest?.humidity ?? 0}
-          max={100}
-        />
-
-        <Gauge
-          label="광량"
-          value={latest?.light ?? 0}
-          max={3000}
-        />
-
-        <Gauge
-          label="EC"
-          value={latest?.ec ?? 0}
-          max={3}
-        />
-
-      </div>
-
-      {/* ===== 경고 ===== */}
-
-      <div className="alert-bar">
-
-        {
-          latest?.temperature > 30 &&
-          <span>🔥 고온</span>
-        }
-
-        {
-          latest?.humidity < 40 &&
-          <span>💧 건조</span>
-        }
-
-        {
-          latest?.ec < 1.2 &&
-          <span>⚠️ EC 낮음</span>
-        }
-
-        {
-          !latest &&
-          <span>
-            데이터 대기중...
-          </span>
-        }
-
-      </div>
-
-      {/* ===== 실시간 그래프 ===== */}
-
-      <div className="chart-grid">
-
-        <LiveChart
-
-          label="온도"
-
-          data={history.map(h => ({
-            created_at: h.created_at,
-            value: h.temperature
-          }))}
-
-        />
-
-        <LiveChart
-
-          label="습도"
-
-          data={history.map(h => ({
-            created_at: h.created_at,
-            value: h.humidity
-          }))}
-
-        />
-
-        <LiveChart
-
-          label="EC"
-
-          data={history.map(h => ({
-            created_at: h.created_at,
-            value: h.ec || 0
-          }))}
-
-        />
-
-      </div>
-
-      {/* ===== 양액 ===== */}
-
-      <div className="nutrient-box">
-
-        <h3>
-          🧪 양액 시스템
-        </h3>
-
-        <div className="nutrient-grid">
-
-          <div>
-            EC :
-            {latest?.ec ?? '--'}
-          </div>
-
-          <div>
-            pH :
-            {latest?.ph ?? '--'}
-          </div>
-
-          <div>
-            수온 :
-            {latest?.water_temp ?? 22}
-          </div>
-
-          <div>
-            누적광량 :
-            {latest?.light_sum ?? 0}
-          </div>
-
+                <button
+                  className="off-btn"
+                  onClick={() =>
+                    toggleDevice(key, false)
+                  }
+                >
+                  OFF
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-
       </div>
 
-      {/* ===== 그룹 상태 ===== */}
+      {/* 자동 관수 */}
+      <div className="auto-panel">
+        <h2>자동 관수 시스템</h2>
 
-      <div className="device-status">
-
-        <h3>
-          ⚡ 장치 상태
-        </h3>
-
-        <div className="device-grid">
-
-          <Device
-            name="FAN"
-            on={latest?.fan}
+        <div className="auto-grid">
+          <AutoCard
+            title="시간 관수"
+            desc="설정 시간 자동 공급"
           />
 
-          <Device
-            name="PUMP"
-            on={latest?.pump}
+          <AutoCard
+            title="간격 관수"
+            desc="주기적 반복 공급"
           />
 
-          <Device
-            name="LED"
-            on={latest?.led}
+          <AutoCard
+            title="광량 관수"
+            desc="광량 기준 자동 공급"
           />
 
-          <Device
-            name="HEATER"
-            on={latest?.heater}
+          <AutoCard
+            title="그룹 제어"
+            desc="구역별 제어"
           />
-
         </div>
-
       </div>
 
-      {/* ===== 장치 제어 ===== */}
+      <style jsx>{`
+        .dashboard {
+          min-height: 100vh;
+          background: #0f172a;
+          color: white;
+          padding: 20px;
+        }
 
-      <ControlPanel
-        latest={latest}
-      />
+        .main-title {
+          font-size: 36px;
+          font-weight: bold;
+          margin-bottom: 24px;
+        }
 
-      {/* ===== 스케줄 ===== */}
+        .sensor-grid {
+          display: grid;
+          grid-template-columns: repeat(
+            auto-fit,
+            minmax(180px, 1fr)
+          );
+          gap: 16px;
+          margin-bottom: 24px;
+        }
 
-      <SchedulePanel />
+        .control-grid,
+        .auto-grid,
+        .status-grid {
+          display: grid;
+          grid-template-columns: repeat(
+            auto-fit,
+            minmax(220px, 1fr)
+          );
+          gap: 16px;
+        }
 
+        .card,
+        .control-card,
+        .auto-card,
+        .status-box,
+        .nutrient-panel,
+        .control-panel,
+        .auto-panel {
+          background: #1e293b;
+          border-radius: 16px;
+          padding: 20px;
+          border: 1px solid #334155;
+        }
+
+        .value {
+          font-size: 28px;
+          font-weight: bold;
+          margin-top: 10px;
+          color: #38bdf8;
+        }
+
+        .btn-group {
+          display: flex;
+          gap: 10px;
+          margin-top: 16px;
+        }
+
+        button {
+          flex: 1;
+          border: none;
+          padding: 10px;
+          border-radius: 10px;
+          cursor: pointer;
+          font-weight: bold;
+        }
+
+        .on-btn {
+          background: #16a34a;
+          color: white;
+        }
+
+        .off-btn {
+          background: #dc2626;
+          color: white;
+        }
+
+        .on-text {
+          color: #4ade80;
+          font-size: 24px;
+          font-weight: bold;
+        }
+
+        .off-text {
+          color: #f87171;
+          font-size: 24px;
+          font-weight: bold;
+        }
+
+        h2 {
+          margin-bottom: 20px;
+          font-size: 24px;
+        }
+      `}</style>
     </div>
-
   );
 }
 
-// ===== 카드 =====
-
-function Stat({
+function Card({
   title,
   value,
-  unit
-}: any) {
-
+}: {
+  title: string;
+  value: string;
+}) {
   return (
-
-    <div className="stat">
-
-      <p>{title}</p>
-
-      <h2>
-        {value ?? '--'}
-        {unit}
-      </h2>
-
+    <div className="card">
+      <h3>{title}</h3>
+      <div className="value">{value}</div>
     </div>
-
   );
 }
 
-// ===== 게이지 =====
-
-function Gauge({
+function StatusBox({
   label,
   value,
-  max
-}: any) {
-
-  const safe =
-    Math.min(
-      100,
-      Math.max(
-        0,
-        (value / max) * 100
-      )
-    );
-
+}: {
+  label: string;
+  value: string;
+}) {
   return (
-
-    <div className="gauge">
-
-      <svg viewBox="0 0 100 100">
-
-        <circle
-          cx="50"
-          cy="50"
-          r="40"
-          stroke="#222"
-          strokeWidth="8"
-          fill="none"
-        />
-
-        <circle
-          cx="50"
-          cy="50"
-          r="40"
-          stroke="#00e5ff"
-          strokeWidth="8"
-          fill="none"
-
-          strokeDasharray={`
-            ${safe * 2.5},
-            251
-          `}
-
-          transform="
-            rotate(-90 50 50)
-          "
-        />
-
-      </svg>
-
-      <p>{label}</p>
-
-      <h3>{value}</h3>
-
+    <div className="status-box">
+      <h3>{label}</h3>
+      <div className="value">{value}</div>
     </div>
-
   );
 }
 
-// ===== 장치 상태 =====
-
-function Device({
-  name,
-  on
-}: any) {
-
+function AutoCard({
+  title,
+  desc,
+}: {
+  title: string;
+  desc: string;
+}) {
   return (
-
-    <div
-      className={
-        on
-          ? 'device on-state'
-          : 'device off-state'
-      }
-    >
-
-      {name}
-
+    <div className="auto-card">
+      <h3>{title}</h3>
+      <p>{desc}</p>
     </div>
-
   );
 }
