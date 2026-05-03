@@ -24,10 +24,10 @@ export default function DashboardPage() {
   const [time, setTime] = useState('');
 
   const [weather, setWeather] = useState({
-    city: '위치 확인중...',
-    sky: '로딩중...',
-    outsideTemp: 0,
-    wind: 0,
+    city: '서울',
+    sky: '맑음',
+    outsideTemp: 26,
+    wind: 2.3,
     rain: '0mm',
   });
 
@@ -73,40 +73,22 @@ export default function DashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // GPS 위치
+  // 실시간 센서 테스트
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition(
-      () => {
-        setWeather({
-          city: '서울',
-          sky: '맑음',
-          outsideTemp: 26,
-          wind: 2.3,
-          rain: '0mm',
-        });
-      },
-      () => {
-        console.log('위치 권한 거부');
-      }
-    );
-  }, []);
+    const interval = setInterval(() => {
+      setSensors({
+        temperature: +(20 + Math.random() * 10).toFixed(1),
+        humidity: +(40 + Math.random() * 40).toFixed(1),
+        ec: +(1 + Math.random() * 4).toFixed(1),
+        ph: +(5 + Math.random() * 2).toFixed(1),
+        waterTemp: +(18 + Math.random() * 8).toFixed(1),
+        lux: Math.floor(
+          10000 + Math.random() * 40000
+        ),
+      });
+    }, 2000);
 
-  // MQTT 자리
-  useEffect(() => {
-    // client.subscribe('farm/sensors');
-
-    // client.on('message', (_, msg) => {
-    //   const data = JSON.parse(msg.toString());
-
-    //   setSensors({
-    //     temperature: data.temperature,
-    //     humidity: data.humidity,
-    //     ec: data.ec,
-    //     ph: data.ph,
-    //     waterTemp: data.waterTemp,
-    //     lux: data.lux,
-    //   });
-    // });
+    return () => clearInterval(interval);
   }, []);
 
   const toggleDevice = (
@@ -117,16 +99,7 @@ export default function DashboardPage() {
       ...prev,
       [key]: value,
     }));
-
-    console.log('MQTT SEND', {
-      device: key,
-      value,
-    });
-
-    // client.publish(...)
   };
-
-  const gaugeRotate = sensors.ec * 25;
 
   return (
     <div className="dashboard">
@@ -168,7 +141,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* 센서 */}
+      {/* 실시간 센서 */}
       <section className="panel">
         <h2>실시간 센서 데이터</h2>
 
@@ -205,70 +178,63 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* 속도계 */}
+      {/* 계기판 */}
       <section className="panel">
-        <h2>EC 속도계</h2>
+        <h2>실시간 계측 그래프</h2>
 
-        <div className="gauge-wrap">
-          <div className="gauge">
-            <div
-              className="needle"
-              style={{
-                transform: `rotate(${gaugeRotate}deg)`,
-              }}
-            />
+        <div className="gauge-grid">
+          <Gauge
+            title="EC"
+            value={sensors.ec}
+            min={0}
+            max={10}
+            unit="ds/m"
+            color="#00ffff"
+          />
 
-            <div className="center">
-              {sensors.ec}
-            </div>
+          <Gauge
+            title="pH"
+            value={sensors.ph}
+            min={0}
+            max={14}
+            unit="pH"
+            color="#ffff00"
+          />
 
-            <span className="g1">1.0</span>
-            <span className="g5">5.0</span>
-            <span className="g10">10</span>
-          </div>
-        </div>
-      </section>
+          <Gauge
+            title="광량"
+            value={sensors.lux}
+            min={0}
+            max={50000}
+            unit="lux"
+            color="#ff8800"
+          />
 
-      {/* 주파수 그래프 */}
-      <section className="panel">
-        <h2>EC 주파수 그래프</h2>
-
-        <div className="freq">
-          {[1, 2, 3, 4, 5, 6].map((n) => (
-            <div
-              key={n}
-              className="freq-bar"
-              style={{
-                height: `${sensors.ec * n * 10}px`,
-              }}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* 움직이는 그래프 */}
-      <section className="panel">
-        <h2>실시간 환경 그래프</h2>
-
-        <div className="bars">
-          <Bar
-            label="온도"
+          <Gauge
+            title="온도"
             value={sensors.temperature}
+            min={0}
+            max={50}
+            unit="°C"
+            color="#ff0000"
           />
 
-          <Bar
-            label="습도"
+          <Gauge
+            title="습도"
             value={sensors.humidity}
+            min={0}
+            max={100}
+            unit="%"
+            color="#00ff00"
           />
 
-          <Bar
-            label="광량"
-            value={sensors.lux / 1000}
-          />
-
-          <Bar
-            label="양액온도"
+          <Gauge
+            title="양액온도"
             value={sensors.waterTemp}
+            min={0}
+            max={40}
+            unit="°C"
+            color="#aa00ff"
           />
         </div>
       </section>
@@ -323,7 +289,7 @@ export default function DashboardPage() {
             >
               <h3>{key.toUpperCase()}</h3>
 
-              <p>
+              <p className="status">
                 {devices[key]
                   ? 'ON'
                   : 'OFF'}
@@ -368,8 +334,9 @@ export default function DashboardPage() {
         }
 
         .title {
-          font-size: 40px;
+          font-size: 42px;
           color: #38bdf8;
+          margin-bottom: 10px;
         }
 
         .clock {
@@ -379,9 +346,9 @@ export default function DashboardPage() {
 
         .panel {
           background: #111827;
-          margin-bottom: 24px;
           padding: 20px;
           border-radius: 20px;
+          margin-bottom: 25px;
         }
 
         .grid {
@@ -402,107 +369,65 @@ export default function DashboardPage() {
 
         .value {
           font-size: 28px;
-          color: #22d3ee;
           margin-top: 10px;
+          color: #22d3ee;
         }
 
-        .gauge-wrap {
-          display: flex;
-          justify-content: center;
-        }
-
-        .gauge {
-          width: 240px;
-          height: 240px;
-          border-radius: 50%;
-          background: conic-gradient(
-            red,
-            green,
-            blue
+        .gauge-grid {
+          display: grid;
+          grid-template-columns: repeat(
+            3,
+            1fr
           );
+          gap: 20px;
+        }
+
+        .gauge-card {
+          background: #0f172a;
+          padding: 20px;
+          border-radius: 20px;
+          text-align: center;
+        }
+
+        .meter {
+          width: 220px;
+          height: 220px;
+          margin: auto;
+          border-radius: 50%;
+          border: 10px solid;
           position: relative;
+          background: #020617;
         }
 
         .needle {
           width: 4px;
-          height: 100px;
-          background: white;
+          height: 90px;
           position: absolute;
-          left: 50%;
           bottom: 50%;
+          left: 50%;
           transform-origin: bottom;
         }
 
-        .center {
+        .meter-center {
           position: absolute;
-          width: 120px;
-          height: 120px;
-          background: #000;
+          width: 110px;
+          height: 110px;
+          background: black;
           border-radius: 50%;
           top: 50%;
           left: 50%;
-          transform: translate(-50%, -50%);
+          transform: translate(
+            -50%,
+            -50%
+          );
+
           display: flex;
+          flex-direction: column;
           justify-content: center;
           align-items: center;
-          font-size: 30px;
-        }
 
-        .g1,
-        .g5,
-        .g10 {
-          position: absolute;
+          font-size: 24px;
           font-weight: bold;
-        }
-
-        .g1 {
-          left: 20px;
-          bottom: 30px;
-        }
-
-        .g5 {
-          top: 10px;
-          left: 50%;
-          transform: translateX(-50%);
-        }
-
-        .g10 {
-          right: 20px;
-          bottom: 30px;
-        }
-
-        .freq {
-          display: flex;
-          align-items: end;
-          gap: 10px;
-          height: 180px;
-        }
-
-        .freq-bar {
-          flex: 1;
-          background: cyan;
-        }
-
-        .bars {
-          display: flex;
-          align-items: end;
-          gap: 20px;
-          height: 180px;
-        }
-
-        .bar-wrap {
-          flex: 1;
-          text-align: center;
-        }
-
-        .bar {
-          width: 40px;
-          margin: auto;
-          background: linear-gradient(
-            to top,
-            #2563eb,
-            #22d3ee
-          );
         }
 
         .btns {
@@ -515,8 +440,9 @@ export default function DashboardPage() {
           flex: 1;
           border: none;
           padding: 10px;
-          color: white;
           border-radius: 10px;
+          color: white;
+          cursor: pointer;
         }
 
         .on {
@@ -525,6 +451,35 @@ export default function DashboardPage() {
 
         .off {
           background: red;
+        }
+
+        .status {
+          font-size: 26px;
+          font-weight: bold;
+        }
+
+        @media (
+          max-width: 1000px
+        ) {
+          .gauge-grid {
+            grid-template-columns: repeat(
+              2,
+              1fr
+            );
+          }
+        }
+
+        @media (
+          max-width: 700px
+        ) {
+          .gauge-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .meter {
+            width: 180px;
+            height: 180px;
+          }
         }
       `}</style>
     </div>
@@ -549,25 +504,51 @@ function InfoCard({
   );
 }
 
-function Bar({
-  label,
+function Gauge({
+  title,
   value,
+  min,
+  max,
+  unit,
+  color,
 }: {
-  label: string;
+  title: string;
   value: number;
+  min: number;
+  max: number;
+  unit: string;
+  color: string;
 }) {
+  const rotate =
+    ((value - min) /
+      (max - min)) *
+      180 -
+    90;
+
   return (
-    <div className="bar-wrap">
+    <div className="gauge-card">
+      <h3>{title}</h3>
+
       <div
-        className="bar"
+        className="meter"
         style={{
-          height: `${value}px`,
+          borderColor: color,
         }}
-      />
+      >
+        <div
+          className="needle"
+          style={{
+            transform: `rotate(${rotate}deg)`,
+            background: color,
+          }}
+        />
 
-      <p>{label}</p>
+        <div className="meter-center">
+          <div>{value}</div>
 
-      <span>{value}</span>
+          <small>{unit}</small>
+        </div>
+      </div>
     </div>
   );
 }
