@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -47,6 +46,15 @@ export default function DashboardPage() {
       wind: '--',
       source:
         '기상청 제공',
+    });
+
+  const [controls,
+    setControls] =
+    useState({
+      fan: false,
+      pump: false,
+      led: false,
+      heater: false,
     });
 
   const [sensors, setSensors] =
@@ -171,7 +179,7 @@ export default function DashboardPage() {
 
   }, []);
 
-  // 센서
+  // 센서 데이터
 
   useEffect(() => {
 
@@ -251,6 +259,26 @@ export default function DashboardPage() {
 
   }, []);
 
+  const toggleControl = (
+    key:
+      keyof typeof controls
+  ) => {
+
+    setControls(prev => ({
+
+      ...prev,
+
+      [key]:
+        !prev[key],
+
+    }));
+
+    console.log(
+      'MQTT SEND',
+      key
+    );
+  };
+
   return (
 
     <div className="dashboard">
@@ -317,7 +345,7 @@ export default function DashboardPage() {
 
       </section>
 
-      {/* 원형계기판 */}
+      {/* 원형 계기판 */}
 
       <section className="panel glass-dark">
 
@@ -332,7 +360,6 @@ export default function DashboardPage() {
             value={
               sensors.temperature
             }
-            max={50}
             unit="°C"
           />
 
@@ -341,14 +368,14 @@ export default function DashboardPage() {
             value={
               sensors.humidity
             }
-            max={100}
             unit="%"
           />
 
           <Gauge
             title="EC"
-            value={sensors.ec}
-            max={10}
+            value={
+              sensors.ec
+            }
             unit="ds/m"
           />
 
@@ -496,7 +523,72 @@ export default function DashboardPage() {
 
       </section>
 
-      {/* footer */}
+      {/* 제어 시스템 */}
+
+      <section className="panel glass-control">
+
+        <h2>
+          제어 시스템
+        </h2>
+
+        <div className="control-grid">
+
+          {(
+            Object.keys(
+              controls
+            ) as Array<
+              keyof typeof controls
+            >
+          ).map(key => (
+
+            <div
+              key={key}
+              className="control-card"
+            >
+
+              <h3>
+                {key.toUpperCase()}
+              </h3>
+
+              <div className="status">
+
+                상태 :
+                {
+                  controls[key]
+                    ? ' ON'
+                    : ' OFF'
+                }
+
+              </div>
+
+              <button
+                className={
+                  controls[key]
+                    ? 'btn-on'
+                    : 'btn-off'
+                }
+                onClick={() =>
+                  toggleControl(
+                    key
+                  )
+                }
+              >
+
+                {
+                  controls[key]
+                    ? 'TURN OFF'
+                    : 'TURN ON'
+                }
+
+              </button>
+
+            </div>
+
+          ))}
+
+        </div>
+
+      </section>
 
       <footer className="footer">
 
@@ -569,15 +661,6 @@ export default function DashboardPage() {
                 0.95
               )
             );
-
-          box-shadow:
-            0 0 30px
-            rgba(
-              0,
-              150,
-              255,
-              0.15
-            );
         }
 
         .glass-dark {
@@ -640,6 +723,26 @@ export default function DashboardPage() {
             );
         }
 
+        .glass-control {
+
+          background:
+            linear-gradient(
+              145deg,
+              rgba(
+                20,
+                40,
+                60,
+                0.95
+              ),
+              rgba(
+                5,
+                10,
+                25,
+                0.95
+              )
+            );
+        }
+
         .grid {
 
           display: grid;
@@ -668,15 +771,6 @@ export default function DashboardPage() {
               255,
               255,
               0.05
-            );
-
-          border:
-            1px solid
-            rgba(
-              255,
-              255,
-              255,
-              0.06
             );
         }
 
@@ -817,8 +911,6 @@ export default function DashboardPage() {
           padding: 10px 16px;
 
           border-radius: 12px;
-
-          cursor: pointer;
         }
 
         .history-grid {
@@ -871,6 +963,73 @@ export default function DashboardPage() {
           color: #94a3b8;
         }
 
+        .control-grid {
+
+          display: grid;
+
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(
+                240px,
+                1fr
+              )
+            );
+
+          gap: 20px;
+        }
+
+        .control-card {
+
+          background:
+            rgba(
+              255,
+              255,
+              255,
+              0.05
+            );
+
+          padding: 24px;
+
+          border-radius: 20px;
+        }
+
+        .status {
+
+          margin:
+            15px 0;
+        }
+
+        .btn-on,
+        .btn-off {
+
+          width: 100%;
+
+          border: none;
+
+          padding: 14px;
+
+          border-radius: 14px;
+
+          color: white;
+
+          font-weight: bold;
+
+          cursor: pointer;
+        }
+
+        .btn-on {
+
+          background:
+            #dc2626;
+        }
+
+        .btn-off {
+
+          background:
+            #16a34a;
+        }
+
         .footer {
 
           text-align: center;
@@ -915,12 +1074,10 @@ function GlassCard({
 function Gauge({
   title,
   value,
-  max,
   unit,
 }: {
   title: string;
   value: number;
-  max: number;
   unit: string;
 }) {
 
