@@ -48,7 +48,7 @@ export default function DashboardPage() {
   const [weather, setWeather] =
     useState<WeatherData>({
       city: '서울',
-      condition: '불러오는 중...',
+      condition: '연결중...',
       temp: '--',
       humidity: '--',
       wind: '--',
@@ -113,7 +113,7 @@ export default function DashboardPage() {
 
   }, []);
 
-  // 실시간 외부 기상 정보
+  // 실시간 외부 기상 데이터
 
   useEffect(() => {
 
@@ -146,7 +146,7 @@ export default function DashboardPage() {
           humidity:
             data.humidity
               ? `${data.humidity}%`
-              : '측정중',
+              : '--',
 
           wind:
             `${data.windspeed} km/h`,
@@ -159,7 +159,7 @@ export default function DashboardPage() {
           city: '서울',
 
           condition:
-            '기상 데이터 오류',
+            '기상 오류',
 
           temp: '--',
 
@@ -183,7 +183,7 @@ export default function DashboardPage() {
 
   }, []);
 
-  // 실시간 센서
+  // 센서 실시간 데이터
 
   useEffect(() => {
 
@@ -288,7 +288,7 @@ export default function DashboardPage() {
         {time}
       </p>
 
-      {/* 실시간 상황 */}
+      {/* 실시간 상황 계기판 */}
 
       <section className="panel">
 
@@ -471,6 +471,214 @@ export default function DashboardPage() {
 
       </section>
 
+      {/* 센서 히스토리 */}
+
+      <section className="panel">
+
+        <h2>
+          센서 히스토리
+        </h2>
+
+        <div className="history-grid">
+
+          <div className="history-card">
+
+            <h3>
+              온도
+            </h3>
+
+            <p>
+              최소 :
+              {
+                history.length > 0
+                  ? Math.min(
+                      ...history.map(
+                        h =>
+                          h.temperature
+                      )
+                    )
+                  : 0
+              }
+              °C
+            </p>
+
+            <p>
+              최대 :
+              {
+                history.length > 0
+                  ? Math.max(
+                      ...history.map(
+                        h =>
+                          h.temperature
+                      )
+                    )
+                  : 0
+              }
+              °C
+            </p>
+
+            <p>
+              평균 :
+              {
+                history.length > 0
+                  ? (
+                      history.reduce(
+                        (
+                          a,
+                          b
+                        ) =>
+                          a +
+                          b.temperature,
+                        0
+                      ) /
+                      history.length
+                    ).toFixed(1)
+                  : 0
+              }
+              °C
+            </p>
+
+          </div>
+
+          <div className="history-card">
+
+            <h3>
+              습도
+            </h3>
+
+            <p>
+              최소 :
+              {
+                history.length > 0
+                  ? Math.min(
+                      ...history.map(
+                        h =>
+                          h.humidity
+                      )
+                    )
+                  : 0
+              }
+              %
+            </p>
+
+            <p>
+              최대 :
+              {
+                history.length > 0
+                  ? Math.max(
+                      ...history.map(
+                        h =>
+                          h.humidity
+                      )
+                    )
+                  : 0
+              }
+              %
+            </p>
+
+            <p>
+              평균 :
+              {
+                history.length > 0
+                  ? (
+                      history.reduce(
+                        (
+                          a,
+                          b
+                        ) =>
+                          a +
+                          b.humidity,
+                        0
+                      ) /
+                      history.length
+                    ).toFixed(1)
+                  : 0
+              }
+              %
+            </p>
+
+          </div>
+
+          <div className="history-card">
+
+            <h3>
+              EC
+            </h3>
+
+            <p>
+              현재 :
+              {
+                sensors.ec
+              }
+            </p>
+
+          </div>
+
+          <div className="history-card">
+
+            <h3>
+              PH
+            </h3>
+
+            <p>
+              현재 :
+              {
+                sensors.ph
+              }
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      {/* 제어 시스템 */}
+
+      <section className="panel">
+
+        <h2>
+          제어 시스템
+        </h2>
+
+        <div className="control-grid">
+
+          {[
+            'FAN',
+            'PUMP',
+            'LED',
+            'HEATER',
+          ].map(device => (
+
+            <div
+              key={device}
+              className="control-card"
+            >
+
+              <h3>
+                {device}
+              </h3>
+
+              <div className="control-buttons">
+
+                <button className="on">
+                  ON
+                </button>
+
+                <button className="off">
+                  OFF
+                </button>
+
+              </div>
+
+            </div>
+
+          ))}
+
+        </div>
+
+      </section>
+
       <style jsx>{`
 
         .dashboard {
@@ -563,16 +771,16 @@ export default function DashboardPage() {
             linear-gradient(
               145deg,
               rgba(
-                255,
-                255,
-                255,
-                0.08
+                14,
+                116,
+                144,
+                0.35
               ),
               rgba(
-                255,
-                255,
-                255,
-                0.02
+                15,
+                23,
+                42,
+                0.92
               )
             );
 
@@ -582,18 +790,18 @@ export default function DashboardPage() {
 
           border:
             1px solid rgba(
-              255,
-              255,
-              255,
-              0.05
+              56,
+              189,
+              248,
+              0.2
             );
 
           box-shadow:
-            inset 0 0 20px rgba(
-              255,
-              255,
-              255,
-              0.03
+            0 0 25px rgba(
+              56,
+              189,
+              248,
+              0.12
             );
         }
 
@@ -704,6 +912,137 @@ export default function DashboardPage() {
         .gauge-unit {
 
           color: #94a3b8;
+        }
+
+        .history-grid {
+
+          display: grid;
+
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(
+                220px,
+                1fr
+              )
+            );
+
+          gap: 20px;
+        }
+
+        .history-card {
+
+          background:
+            linear-gradient(
+              145deg,
+              rgba(
+                30,
+                41,
+                59,
+                0.9
+              ),
+              rgba(
+                15,
+                23,
+                42,
+                0.9
+              )
+            );
+
+          padding: 24px;
+
+          border-radius: 20px;
+
+          border:
+            1px solid rgba(
+              56,
+              189,
+              248,
+              0.15
+            );
+        }
+
+        .control-grid {
+
+          display: grid;
+
+          grid-template-columns:
+            repeat(
+              auto-fit,
+              minmax(
+                220px,
+                1fr
+              )
+            );
+
+          gap: 20px;
+        }
+
+        .control-card {
+
+          background:
+            linear-gradient(
+              145deg,
+              rgba(
+                15,
+                23,
+                42,
+                0.95
+              ),
+              rgba(
+                30,
+                41,
+                59,
+                0.9
+              )
+            );
+
+          border-radius: 20px;
+
+          padding: 24px;
+        }
+
+        .control-buttons {
+
+          display: flex;
+
+          gap: 10px;
+
+          margin-top: 15px;
+        }
+
+        .on {
+
+          flex: 1;
+
+          background: #16a34a;
+
+          border: none;
+
+          padding: 12px;
+
+          border-radius: 12px;
+
+          color: white;
+
+          font-weight: bold;
+        }
+
+        .off {
+
+          flex: 1;
+
+          background: #dc2626;
+
+          border: none;
+
+          padding: 12px;
+
+          border-radius: 12px;
+
+          color: white;
+
+          font-weight: bold;
         }
 
       `}</style>
