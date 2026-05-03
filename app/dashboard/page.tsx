@@ -23,14 +23,6 @@ type SensorData = {
   lux: number;
 };
 
-type WeatherData = {
-  city: string;
-  condition: string;
-  temp: string;
-  humidity: string;
-  wind: string;
-};
-
 type HistoryData = {
   time: string;
   temperature: number;
@@ -45,35 +37,42 @@ export default function DashboardPage() {
   const [time, setTime] =
     useState('');
 
+  const [historyMode,
+    setHistoryMode] =
+    useState('1H');
+
   const [weather, setWeather] =
-    useState<WeatherData>({
-      city: '서울',
-      condition: '연결중...',
+    useState({
       temp: '--',
-      humidity: '--',
       wind: '--',
+      source:
+        '기상청 제공',
     });
 
   const [sensors, setSensors] =
     useState<SensorData>({
       temperature: 24,
       humidity: 58,
-      ec: 2.3,
+      ec: 2.2,
       ph: 6.1,
       waterTemp: 21,
       lux: 32000,
     });
 
-  const [history, setHistory] =
-    useState<HistoryData[]>([]);
+  const [history,
+    setHistory] =
+    useState<HistoryData[]>(
+      []
+    );
 
-  // 실시간 시간
+  // 시간
 
   useEffect(() => {
 
     const updateClock = () => {
 
-      const now = new Date();
+      const now =
+        new Date();
 
       const days = [
         '일',
@@ -113,11 +112,11 @@ export default function DashboardPage() {
 
   }, []);
 
-  // 실시간 외부 기상 데이터
+  // 날씨
 
   useEffect(() => {
 
-    async function fetchWeather() {
+    async function loadWeather() {
 
       try {
 
@@ -135,46 +134,35 @@ export default function DashboardPage() {
 
         setWeather({
 
-          city: '서울',
-
-          condition:
-            '실시간 외부 환경',
-
           temp:
             `${data.temperature}°C`,
 
-          humidity:
-            data.humidity
-              ? `${data.humidity}%`
-              : '--',
-
           wind:
             `${data.windspeed} km/h`,
+
+          source:
+            '기상청 제공',
         });
 
       } catch {
 
         setWeather({
 
-          city: '서울',
-
-          condition:
-            '기상 오류',
-
           temp: '--',
 
-          humidity: '--',
-
           wind: '--',
+
+          source:
+            '기상청 연결 실패',
         });
       }
     }
 
-    fetchWeather();
+    loadWeather();
 
     const interval =
       setInterval(
-        fetchWeather,
+        loadWeather,
         60000
       );
 
@@ -183,7 +171,7 @@ export default function DashboardPage() {
 
   }, []);
 
-  // 센서 실시간 데이터
+  // 센서
 
   useEffect(() => {
 
@@ -211,7 +199,7 @@ export default function DashboardPage() {
           ec:
             Number(
               (
-                1.5 +
+                1.2 +
                 Math.random() * 2
               ).toFixed(1)
             ),
@@ -220,7 +208,7 @@ export default function DashboardPage() {
             Number(
               (
                 5.5 +
-                Math.random() * 1
+                Math.random()
               ).toFixed(1)
             ),
 
@@ -236,7 +224,7 @@ export default function DashboardPage() {
             Math.floor(
               20000 +
               Math.random() *
-                20000
+                25000
             ),
         };
 
@@ -244,28 +232,15 @@ export default function DashboardPage() {
 
         setHistory(prev => [
 
-          ...prev.slice(-40),
+          ...prev.slice(-80),
 
           {
             time:
               new Date()
                 .toLocaleTimeString()
-                .slice(3, 8),
+                .slice(0, 8),
 
-            temperature:
-              data.temperature,
-
-            humidity:
-              data.humidity,
-
-            ec:
-              data.ec,
-
-            ph:
-              data.ph,
-
-            waterTemp:
-              data.waterTemp,
+            ...data,
           },
         ]);
 
@@ -284,28 +259,32 @@ export default function DashboardPage() {
         Glovera 농장 스마트팜 대시보드
       </h1>
 
-      <p className="clock">
+      <div className="clock">
         {time}
-      </p>
+      </div>
 
-      {/* 실시간 상황 계기판 */}
+      {/* 상황판 */}
 
-      <section className="panel">
+      <section className="panel glass-blue">
 
         <h2>
           실시간 상황 계기판
         </h2>
 
-        <div className="status-grid">
+        <div className="grid">
 
           <GlassCard
-            title="외부 온도"
-            value={weather.temp}
+            title="외부온도"
+            value={
+              weather.temp
+            }
           />
 
           <GlassCard
             title="풍속"
-            value={weather.wind}
+            value={
+              weather.wind
+            }
           />
 
           <GlassCard
@@ -330,11 +309,17 @@ export default function DashboardPage() {
 
         </div>
 
+        <div className="source">
+
+          {weather.source}
+
+        </div>
+
       </section>
 
-      {/* 원형 계기판 */}
+      {/* 원형계기판 */}
 
-      <section className="panel">
+      <section className="panel glass-dark">
 
         <h2>
           실시간 원형 분석 계기판
@@ -367,46 +352,21 @@ export default function DashboardPage() {
             unit="ds/m"
           />
 
-          <Gauge
-            title="PH"
-            value={sensors.ph}
-            max={14}
-            unit="pH"
-          />
-
-          <Gauge
-            title="LIGHT"
-            value={
-              sensors.lux
-            }
-            max={50000}
-            unit="lux"
-          />
-
-          <Gauge
-            title="WATER"
-            value={
-              sensors.waterTemp
-            }
-            max={40}
-            unit="°C"
-          />
-
         </div>
 
       </section>
 
-      {/* 실시간 업다운 그래프 */}
+      {/* 파형 */}
 
-      <section className="panel">
+      <section className="panel glass-wave">
 
         <h2>
-          실시간 업다운 분석 그래프
+          실시간 업다운 파형 분석
         </h2>
 
         <ResponsiveContainer
           width="100%"
-          height={420}
+          height={400}
         >
 
           <AreaChart
@@ -430,7 +390,7 @@ export default function DashboardPage() {
               dataKey="temperature"
               stroke="#ff0000"
               fill="#ff0000"
-              fillOpacity={0.15}
+              fillOpacity={0.2}
             />
 
             <Area
@@ -438,7 +398,7 @@ export default function DashboardPage() {
               dataKey="humidity"
               stroke="#00ff00"
               fill="#00ff00"
-              fillOpacity={0.15}
+              fillOpacity={0.2}
             />
 
             <Area
@@ -446,7 +406,7 @@ export default function DashboardPage() {
               dataKey="ec"
               stroke="#00ccff"
               fill="#00ccff"
-              fillOpacity={0.15}
+              fillOpacity={0.2}
             />
 
             <Area
@@ -454,15 +414,7 @@ export default function DashboardPage() {
               dataKey="ph"
               stroke="#ffff00"
               fill="#ffff00"
-              fillOpacity={0.15}
-            />
-
-            <Area
-              type="monotone"
-              dataKey="waterTemp"
-              stroke="#ff00ff"
-              fill="#ff00ff"
-              fillOpacity={0.15}
+              fillOpacity={0.2}
             />
 
           </AreaChart>
@@ -471,213 +423,88 @@ export default function DashboardPage() {
 
       </section>
 
-      {/* 센서 히스토리 */}
+      {/* history */}
 
-      <section className="panel">
+      <section className="panel glass-history">
 
-        <h2>
-          센서 히스토리
-        </h2>
+        <div className="history-top">
+
+          <h2>
+            센서 History
+          </h2>
+
+          <div className="history-buttons">
+
+            {[
+              '1H',
+              '12H',
+              '24H',
+              '7D',
+            ].map(item => (
+
+              <button
+                key={item}
+                onClick={() =>
+                  setHistoryMode(
+                    item
+                  )
+                }
+              >
+
+                {item}
+
+              </button>
+
+            ))}
+
+          </div>
+
+        </div>
 
         <div className="history-grid">
 
-          <div className="history-card">
+          <HistoryCard
+            title="온도"
+            value={`${sensors.temperature}°C`}
+          />
 
-            <h3>
-              온도
-            </h3>
+          <HistoryCard
+            title="습도"
+            value={`${sensors.humidity}%`}
+          />
 
-            <p>
-              최소 :
-              {
-                history.length > 0
-                  ? Math.min(
-                      ...history.map(
-                        h =>
-                          h.temperature
-                      )
-                    )
-                  : 0
-              }
-              °C
-            </p>
+          <HistoryCard
+            title="EC"
+            value={`${sensors.ec}`}
+          />
 
-            <p>
-              최대 :
-              {
-                history.length > 0
-                  ? Math.max(
-                      ...history.map(
-                        h =>
-                          h.temperature
-                      )
-                    )
-                  : 0
-              }
-              °C
-            </p>
+          <HistoryCard
+            title="PH"
+            value={`${sensors.ph}`}
+          />
 
-            <p>
-              평균 :
-              {
-                history.length > 0
-                  ? (
-                      history.reduce(
-                        (
-                          a,
-                          b
-                        ) =>
-                          a +
-                          b.temperature,
-                        0
-                      ) /
-                      history.length
-                    ).toFixed(1)
-                  : 0
-              }
-              °C
-            </p>
+        </div>
 
-          </div>
+        <div className="log-box">
 
-          <div className="history-card">
+          현재 선택:
+          {historyMode}
 
-            <h3>
-              습도
-            </h3>
-
-            <p>
-              최소 :
-              {
-                history.length > 0
-                  ? Math.min(
-                      ...history.map(
-                        h =>
-                          h.humidity
-                      )
-                    )
-                  : 0
-              }
-              %
-            </p>
-
-            <p>
-              최대 :
-              {
-                history.length > 0
-                  ? Math.max(
-                      ...history.map(
-                        h =>
-                          h.humidity
-                      )
-                    )
-                  : 0
-              }
-              %
-            </p>
-
-            <p>
-              평균 :
-              {
-                history.length > 0
-                  ? (
-                      history.reduce(
-                        (
-                          a,
-                          b
-                        ) =>
-                          a +
-                          b.humidity,
-                        0
-                      ) /
-                      history.length
-                    ).toFixed(1)
-                  : 0
-              }
-              %
-            </p>
-
-          </div>
-
-          <div className="history-card">
-
-            <h3>
-              EC
-            </h3>
-
-            <p>
-              현재 :
-              {
-                sensors.ec
-              }
-            </p>
-
-          </div>
-
-          <div className="history-card">
-
-            <h3>
-              PH
-            </h3>
-
-            <p>
-              현재 :
-              {
-                sensors.ph
-              }
-            </p>
-
-          </div>
+          로그 출력 영역
 
         </div>
 
       </section>
 
-      {/* 제어 시스템 */}
+      {/* footer */}
 
-      <section className="panel">
+      <footer className="footer">
 
-        <h2>
-          제어 시스템
-        </h2>
+        copyright@glovera
+        orginated by jhk
+        in 2026
 
-        <div className="control-grid">
-
-          {[
-            'FAN',
-            'PUMP',
-            'LED',
-            'HEATER',
-          ].map(device => (
-
-            <div
-              key={device}
-              className="control-card"
-            >
-
-              <h3>
-                {device}
-              </h3>
-
-              <div className="control-buttons">
-
-                <button className="on">
-                  ON
-                </button>
-
-                <button className="off">
-                  OFF
-                </button>
-
-              </div>
-
-            </div>
-
-          ))}
-
-        </div>
-
-      </section>
+      </footer>
 
       <style jsx>{`
 
@@ -685,16 +512,17 @@ export default function DashboardPage() {
 
           min-height: 100vh;
 
+          padding: 20px;
+
           background:
             linear-gradient(
               180deg,
               #020617,
-              #0f172a
+              #071226,
+              #020617
             );
 
           color: white;
-
-          padding: 20px;
         }
 
         .title {
@@ -702,54 +530,117 @@ export default function DashboardPage() {
           font-size: 42px;
 
           color: #38bdf8;
-
-          margin-bottom: 10px;
         }
 
         .clock {
 
-          color: #94a3b8;
-
           margin-bottom: 30px;
+
+          color: #94a3b8;
         }
 
         .panel {
 
-          background:
-            rgba(
-              15,
-              23,
-              42,
-              0.82
-            );
-
-          backdrop-filter:
-            blur(12px);
+          padding: 24px;
 
           border-radius: 24px;
 
-          padding: 25px;
-
           margin-bottom: 25px;
 
-          border:
-            1px solid rgba(
-              255,
-              255,
-              255,
-              0.06
+          backdrop-filter:
+            blur(10px);
+        }
+
+        .glass-blue {
+
+          background:
+            linear-gradient(
+              145deg,
+              rgba(
+                0,
+                100,
+                255,
+                0.15
+              ),
+              rgba(
+                15,
+                23,
+                42,
+                0.95
+              )
             );
 
           box-shadow:
-            0 0 25px rgba(
+            0 0 30px
+            rgba(
               0,
+              150,
               255,
-              255,
-              0.04
+              0.15
             );
         }
 
-        .status-grid {
+        .glass-dark {
+
+          background:
+            linear-gradient(
+              145deg,
+              rgba(
+                30,
+                41,
+                59,
+                0.9
+              ),
+              rgba(
+                2,
+                6,
+                23,
+                0.95
+              )
+            );
+        }
+
+        .glass-wave {
+
+          background:
+            linear-gradient(
+              145deg,
+              rgba(
+                10,
+                20,
+                40,
+                0.95
+              ),
+              rgba(
+                0,
+                0,
+                0,
+                0.95
+              )
+            );
+        }
+
+        .glass-history {
+
+          background:
+            linear-gradient(
+              145deg,
+              rgba(
+                15,
+                23,
+                42,
+                0.9
+              ),
+              rgba(
+                30,
+                41,
+                59,
+                0.9
+              )
+            );
+        }
+
+        .grid {
 
           display: grid;
 
@@ -767,53 +658,44 @@ export default function DashboardPage() {
 
         .glass-card {
 
+          padding: 22px;
+
+          border-radius: 20px;
+
           background:
-            linear-gradient(
-              145deg,
-              rgba(
-                14,
-                116,
-                144,
-                0.35
-              ),
-              rgba(
-                15,
-                23,
-                42,
-                0.92
-              )
+            rgba(
+              255,
+              255,
+              255,
+              0.05
             );
-
-          border-radius: 22px;
-
-          padding: 24px;
 
           border:
-            1px solid rgba(
-              56,
-              189,
-              248,
-              0.2
-            );
-
-          box-shadow:
-            0 0 25px rgba(
-              56,
-              189,
-              248,
-              0.12
+            1px solid
+            rgba(
+              255,
+              255,
+              255,
+              0.06
             );
         }
 
         .glass-value {
 
-          font-size: 34px;
+          margin-top: 12px;
 
-          margin-top: 14px;
+          font-size: 34px;
 
           color: #22d3ee;
 
           font-weight: bold;
+        }
+
+        .source {
+
+          margin-top: 20px;
+
+          color: #94a3b8;
         }
 
         .gauge-grid {
@@ -823,29 +705,30 @@ export default function DashboardPage() {
           grid-template-columns:
             repeat(3,1fr);
 
-          gap: 24px;
+          gap: 20px;
         }
 
-        .gauge-card {
+        .gauge {
 
           background:
             rgba(
               255,
               255,
               255,
-              0.03
+              0.04
             );
 
           border-radius: 24px;
 
-          padding: 24px;
+          padding: 20px;
 
           text-align: center;
         }
 
-        .gauge-ring {
+        .ring {
 
           width: 220px;
+
           height: 220px;
 
           margin: auto;
@@ -871,20 +754,13 @@ export default function DashboardPage() {
 
           align-items:
             center;
-
-          box-shadow:
-            0 0 30px rgba(
-              0,
-              255,
-              255,
-              0.25
-            );
         }
 
-        .gauge-inner {
+        .inner {
 
-          width: 175px;
-          height: 175px;
+          width: 170px;
+
+          height: 170px;
 
           border-radius: 50%;
 
@@ -909,9 +785,40 @@ export default function DashboardPage() {
           font-weight: bold;
         }
 
-        .gauge-unit {
+        .history-top {
 
-          color: #94a3b8;
+          display: flex;
+
+          justify-content:
+            space-between;
+
+          align-items:
+            center;
+
+          margin-bottom: 20px;
+        }
+
+        .history-buttons {
+
+          display: flex;
+
+          gap: 10px;
+        }
+
+        .history-buttons button {
+
+          background:
+            #0f172a;
+
+          border: none;
+
+          color: white;
+
+          padding: 10px 16px;
+
+          border-radius: 12px;
+
+          cursor: pointer;
         }
 
         .history-grid {
@@ -933,116 +840,46 @@ export default function DashboardPage() {
         .history-card {
 
           background:
-            linear-gradient(
-              145deg,
-              rgba(
-                30,
-                41,
-                59,
-                0.9
-              ),
-              rgba(
-                15,
-                23,
-                42,
-                0.9
-              )
+            rgba(
+              255,
+              255,
+              255,
+              0.05
             );
 
-          padding: 24px;
+          padding: 20px;
 
           border-radius: 20px;
-
-          border:
-            1px solid rgba(
-              56,
-              189,
-              248,
-              0.15
-            );
         }
 
-        .control-grid {
+        .log-box {
 
-          display: grid;
-
-          grid-template-columns:
-            repeat(
-              auto-fit,
-              minmax(
-                220px,
-                1fr
-              )
-            );
-
-          gap: 20px;
-        }
-
-        .control-card {
+          margin-top: 20px;
 
           background:
-            linear-gradient(
-              145deg,
-              rgba(
-                15,
-                23,
-                42,
-                0.95
-              ),
-              rgba(
-                30,
-                41,
-                59,
-                0.9
-              )
+            rgba(
+              0,
+              0,
+              0,
+              0.4
             );
+
+          padding: 20px;
 
           border-radius: 20px;
 
-          padding: 24px;
+          color: #94a3b8;
         }
 
-        .control-buttons {
+        .footer {
 
-          display: flex;
+          text-align: center;
 
-          gap: 10px;
+          margin-top: 40px;
 
-          margin-top: 15px;
-        }
+          color: #64748b;
 
-        .on {
-
-          flex: 1;
-
-          background: #16a34a;
-
-          border: none;
-
-          padding: 12px;
-
-          border-radius: 12px;
-
-          color: white;
-
-          font-weight: bold;
-        }
-
-        .off {
-
-          flex: 1;
-
-          background: #dc2626;
-
-          border: none;
-
-          padding: 12px;
-
-          border-radius: 12px;
-
-          color: white;
-
-          font-weight: bold;
+          padding-bottom: 30px;
         }
 
       `}</style>
@@ -1087,42 +924,48 @@ function Gauge({
   unit: string;
 }) {
 
-  const percent =
-    Math.min(
-      (value / max) * 100,
-      100
-    );
-
   return (
 
-    <div className="gauge-card">
+    <div className="gauge">
 
       <h3>{title}</h3>
 
-      <div
-        className="gauge-ring"
-        style={{
-          filter:
-            `brightness(${
-              0.5 +
-              percent / 100
-            })`,
-        }}
-      >
+      <div className="ring">
 
-        <div className="gauge-inner">
+        <div className="inner">
 
           <div className="gauge-value">
             {value}
           </div>
 
-          <div className="gauge-unit">
+          <div>
             {unit}
           </div>
 
         </div>
 
       </div>
+
+    </div>
+
+  );
+}
+
+function HistoryCard({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
+
+  return (
+
+    <div className="history-card">
+
+      <h3>{title}</h3>
+
+      <p>{value}</p>
 
     </div>
 
