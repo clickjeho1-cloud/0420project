@@ -1,16 +1,20 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import dynamic from 'next/dynamic';
 
-// 이 파일에 'dynamic'은 한 글자도 들어가지 않습니다.
+// Recharts를 SSR 없이 브라우저에서만 로드
+const Chart = dynamic(() => import('recharts'), { ssr: false });
+
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [Recharts, setRecharts] = useState<any>(null);
-  const [sensors, setSensors] = useState<any>(null);
+  const [sensors, setSensors] = useState<any>({ temperature: 24, humidity: 58, ec: 2.2, ph: 6.1, lux: 32000 });
+  const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
     setMounted(true);
-    // 런타임에만 로드
+    // 런타임에 로드
     import('recharts').then(setRecharts);
 
     const supabase = createClient(
@@ -18,45 +22,57 @@ export default function DashboardPage() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
     );
 
-    supabase.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(1)
-      .then(({ data }) => { if (data && data.length > 0) setSensors(data[0]); });
+    supabase.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(20)
+      .then(({ data }) => { if (data) setHistory(data.reverse()); });
 
     const channel = supabase.channel('realtime_sensor')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sensor_readings' }, (p: any) => setSensors(p.new))
-      .subscribe();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sensor_readings' }, (p: any) => {
+        setSensors(p.new);
+        setHistory(prev => [...prev.slice(-19), p.new]);
+      }).subscribe();
       
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  if (!mounted || !Recharts || !sensors) return <div style={{padding:'50px', color:'white'}}>데이터 연결 중...</div>;
-
-  const { PieChart, Pie, Cell } = Recharts;
+  if (!mounted || !Recharts) return <div style={{padding:'50px', color:'white'}}>로딩 중...</div>;
+  
+  const { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } = Recharts;
 
   return (
     <div className="dashboard">
-      <h1>Glovera 농장 스마트팜</h1>
-      <section className="panel" style={{display: 'flex', gap: '20px', justifyContent: 'center'}}>
-        <Gauge PieChart={PieChart} Pie={Pie} Cell={Cell} title="온도" value={sensors.temperature || 0} unit="°C" color="#f87171" />
-        <Gauge PieChart={PieChart} Pie={Pie} Cell={Cell} title="습도" value={sensors.humidity || 0} unit="%" color="#60a5fa" />
+      <h1>Glovera 농장 스마트팜 대시보드</h1>
+      
+      {/* 상황판 */}
+      <section className="panel glass-blue">
+        <div className="grid">
+          <GlassCard title="온도" value={`${sensors.temperature}°C`} />
+          <GlassCard title="습도" value={`${sensors.humidity}%`} />
+        </div>
       </section>
+
+      {/* 파형 */}
+      <section className="panel glass-wave">
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={history}>
+            <CartesianGrid stroke="#334155" />
+            <XAxis dataKey="created_at" />
+            <YAxis />
+            <Tooltip />
+            <Area type="monotone" dataKey="temperature" stroke="#ff0000" fill="#ff0000" fillOpacity={0.2} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </section>
+
       <style jsx>{`
-        .dashboard { min-height: 100vh; padding: 30px; background: #020617; color: white; }
-        .panel { background: rgba(30,41,59,0.5); padding: 20px; border-radius: 20px; }
+        .dashboard { min-height: 100vh; padding: 20px; background: #020617; color: white; }
+        .panel { padding: 20px; border-radius: 20px; background: rgba(255,255,255,0.05); margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .glass-card { padding: 20px; background: rgba(255,255,255,0.05); border-radius: 20px; }
       `}</style>
     </div>
   );
 }
 
-function Gauge({ PieChart, Pie, Cell, title, value, unit, color }: any) {
-  return (
-    <div style={{textAlign: 'center'}}>
-      <h3>{title}</h3>
-      <PieChart width={150} height={150}>
-        <Pie data={[{value: value}, {value: Math.max(0, 100 - value)}]} startAngle={180} endAngle={0} innerRadius={50} outerRadius={70} dataKey="value">
-          <Cell fill={color} /><Cell fill="#1e293b" />
-        </Pie>
-      </PieChart>
-      <div style={{marginTop: '-40px', fontWeight:'bold'}}>{value}{unit}</div>
-    </div>
-  );
+function GlassCard({ title, value }: any) {
+  return <div className="glass-card"><h3>{title}</h3><div style={{fontSize:'34px'}}>{value}</div></div>;
 }
