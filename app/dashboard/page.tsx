@@ -3,76 +3,73 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import dynamic from 'next/dynamic';
 
-// Recharts를 SSR 없이 브라우저에서만 로드
-const Chart = dynamic(() => import('recharts'), { ssr: false });
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+const ChartClient = dynamic(
+  async () => {
+    const { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } = await import('recharts');
+    return ({ data }: { data: any[] }) => (
+      <ResponsiveContainer width="100%" height={300}>
+        <AreaChart data={data}>
+          <CartesianGrid stroke="#334155" />
+          <XAxis dataKey="created_at" tickFormatter={(t) => t.slice(11, 16)} />
+          <YAxis domain={['auto', 'auto']} />
+          <Tooltip contentStyle={{ background: '#0f172a', border: 'none' }} />
+          <Area type="monotone" dataKey="temperature" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.3} />
+        </AreaChart>
+      </ResponsiveContainer>
+    );
+  },
+  { ssr: false }
+);
 
 export default function DashboardPage() {
-  const [mounted, setMounted] = useState(false);
-  const [Recharts, setRecharts] = useState<any>(null);
-  const [sensors, setSensors] = useState<any>({ temperature: 24, humidity: 58, ec: 2.2, ph: 6.1, lux: 32000 });
+  const [sensors, setSensors] = useState({ temperature: 0, humidity: 0, ec: 0, ph: 0 });
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
-    setMounted(true);
-    // 런타임에 로드
-    import('recharts').then(setRecharts);
+    // 1. 초기 데이터 가져오기 (마지막 30개)
+    supabase.from('sensor_readings')
+      .select('*').order('created_at', { ascending: false }).limit(30)
+      .then(({ data }) => data && setHistory(data.reverse()));
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-    );
-
-    supabase.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(20)
-      .then(({ data }) => { if (data) setHistory(data.reverse()); });
-
+    // 2. 실시간 구독
     const channel = supabase.channel('realtime_sensor')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sensor_readings' }, (p: any) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sensor_readings' }, (p) => {
         setSensors(p.new);
-        setHistory(prev => [...prev.slice(-19), p.new]);
-      }).subscribe();
-      
+        setHistory(prev => [...prev.slice(-29), p.new]);
+      })
+      .subscribe();
+
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  if (!mounted || !Recharts) return <div style={{padding:'50px', color:'white'}}>로딩 중...</div>;
-  
-  const { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } = Recharts;
-
   return (
-    <div className="dashboard">
-      <h1>Glovera 농장 스마트팜 대시보드</h1>
+    <div className="layout">
+      <header><h1>Glovera 스마트팜 모니터링</h1></header>
       
-      {/* 상황판 */}
-      <section className="panel glass-blue">
-        <div className="grid">
-          <GlassCard title="온도" value={`${sensors.temperature}°C`} />
-          <GlassCard title="습도" value={`${sensors.humidity}%`} />
-        </div>
-      </section>
+      <div className="grid">
+        <div className="card"><h3>온도</h3><p>{sensors.temperature}°C</p></div>
+        <div className="card"><h3>습도</h3><p>{sensors.humidity}%</p></div>
+        <div className="card"><h3>EC</h3><p>{sensors.ec} ds/m</p></div>
+        <div className="card"><h3>PH</h3><p>{sensors.ph}</p></div>
+      </div>
 
-      {/* 파형 */}
-      <section className="panel glass-wave">
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={history}>
-            <CartesianGrid stroke="#334155" />
-            <XAxis dataKey="created_at" />
-            <YAxis />
-            <Tooltip />
-            <Area type="monotone" dataKey="temperature" stroke="#ff0000" fill="#ff0000" fillOpacity={0.2} />
-          </AreaChart>
-        </ResponsiveContainer>
+      <section className="chart-area">
+        <ChartClient data={history} />
       </section>
 
       <style jsx>{`
-        .dashboard { min-height: 100vh; padding: 20px; background: #020617; color: white; }
-        .panel { padding: 20px; border-radius: 20px; background: rgba(255,255,255,0.05); margin-bottom: 20px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-        .glass-card { padding: 20px; background: rgba(255,255,255,0.05); border-radius: 20px; }
+        .layout { min-height: 100vh; background: #020617; color: white; padding: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 16px; text-align: center; }
+        .card h3 { color: #94a3b8; font-size: 0.9rem; }
+        .card p { font-size: 1.5rem; font-weight: bold; margin-top: 10px; color: #38bdf8; }
+        .chart-area { background: #0f172a; padding: 20px; border-radius: 20px; }
       `}</style>
     </div>
   );
-}
-
-function GlassCard({ title, value }: any) {
-  return <div className="glass-card"><h3>{title}</h3><div style={{fontSize:'34px'}}>{value}</div></div>;
 }
