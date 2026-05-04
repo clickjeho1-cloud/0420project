@@ -1,25 +1,26 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import dynamic from 'next/dynamic';
-
-// 1. Recharts 전체를 하나의 모듈로 가져와서 필요한 컴포넌트만 추출
-const Recharts = dynamic(() => import('recharts'), { ssr: false });
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
+  const [Recharts, setRecharts] = useState<any>(null);
   const [sensors, setSensors] = useState<any>({ temperature: 0, humidity: 0, ec: 0, lux: 0 });
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
+    // 1. 브라우저에서만 실행되도록 설정
     setMounted(true);
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    if (!url || !key) return;
-
-    const supabase = createClient(url, key);
     
-    // 데이터 로드
+    // 2. 런타임에 동적으로 로드하여 빌드 시 타입 에러 원천 차단
+    import('recharts').then(mod => setRecharts(mod));
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    );
+
+    // 초기 데이터 및 구독
     supabase.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(20)
       .then(({ data }) => { if (data) setHistory(data.reverse()); });
 
@@ -32,25 +33,25 @@ export default function DashboardPage() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  if (!mounted) return <div style={{padding:'50px', color:'white'}}>로딩 중...</div>;
+  if (!mounted || !Recharts) return <div style={{padding:'50px', color:'white'}}>로딩 중...</div>;
 
-  // 2. 렌더링 내부에서 Recharts 컴포넌트 접근
-  const { PieChart, Pie, Cell } = (Recharts as any);
+  const { PieChart, Pie, Cell } = Recharts;
 
   return (
     <div className="dashboard">
       <h1>Glovera 농장 스마트팜 대시보드</h1>
-      <section className="panel" style={{display: 'flex', gap: '20px'}}>
+      <section className="panel" style={{display:'flex', gap:'20px'}}>
         <Gauge PieChart={PieChart} Pie={Pie} Cell={Cell} title="온도" value={sensors.temperature || 0} unit="°C" color="#f87171" />
         <Gauge PieChart={PieChart} Pie={Pie} Cell={Cell} title="습도" value={sensors.humidity || 0} unit="%" color="#60a5fa" />
-        <Gauge PieChart={PieChart} Pie={Pie} Cell={Cell} title="광량" value={Math.min((sensors.lux || 0)/500, 100)} unit="%" color="#fbbf24" />
       </section>
-      {/* 스타일은 동일 */}
+      <style jsx>{`
+        .dashboard { min-height: 100vh; padding: 30px; background: #020617; color: white; }
+        .panel { background: rgba(30,41,59,0.5); padding: 20px; border-radius: 20px; margin-bottom: 20px; }
+      `}</style>
     </div>
   );
 }
 
-// 3. Gauge 컴포넌트가 위에서 전달받은 컴포넌트를 사용하도록 수정
 function Gauge({ PieChart, Pie, Cell, title, value, unit, color }: any) {
   return (
     <div>
@@ -60,7 +61,7 @@ function Gauge({ PieChart, Pie, Cell, title, value, unit, color }: any) {
           <Cell fill={color} /><Cell fill="#1e293b" />
         </Pie>
       </PieChart>
-      <div style={{marginTop: '-40px', fontWeight:'bold'}}>{value}{unit}</div>
+      <div>{value}{unit}</div>
     </div>
   );
 }
