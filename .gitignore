@@ -28,3 +28,6 @@ Thumbs.db
 
 # PowerShell 오타 등으로 생긴 잡파일
 $null
+
+.vercel
+.env*.local
