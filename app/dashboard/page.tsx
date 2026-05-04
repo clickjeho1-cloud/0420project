@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
 
 export default function DashboardPage() {
@@ -8,9 +8,8 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [controls, setControls] = useState({ fan: false, pump: false, led: false });
   const [config, setConfig] = useState({ tempThreshold: 18, minLux: 20000 });
-  const [supabase, setSupabase] = useState<any>(null);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
 
-  // 1. 빌드 에러 방지를 위해 클라이언트 초기화를 useEffect 안에서만 실행
   useEffect(() => {
     const client = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -19,7 +18,6 @@ export default function DashboardPage() {
     setSupabase(client);
   }, []);
 
-  // 2. 실시간 구독
   useEffect(() => {
     if (!supabase) return;
 
@@ -31,14 +29,18 @@ export default function DashboardPage() {
       })
       .subscribe();
 
-    supabase.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(20).then(({data}) => {
-      if(data) setHistory(data.reverse());
-    });
+    supabase
+      .from('sensor_readings')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }: { data: any[] | null }) => {
+        if (data) setHistory(data.reverse());
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [supabase]);
 
-  // 3. 자동 제어 로직
   useMemo(() => {
     setControls(prev => ({
       ...prev,
@@ -52,8 +54,8 @@ export default function DashboardPage() {
       <h1>Glovera 농장 스마트팜 대시보드</h1>
       
       <section className="panel grid-gauge">
-        <Gauge title="온도" value={sensors.temperature} unit="°C" color="#f87171" />
-        <Gauge title="습도" value={sensors.humidity} unit="%" color="#60a5fa" />
+        <Gauge title="온도" value={sensors.temperature || 0} unit="°C" color="#f87171" />
+        <Gauge title="습도" value={sensors.humidity || 0} unit="%" color="#60a5fa" />
         <Gauge title="광량(Lux)" value={Math.min((sensors.lux || 0)/500, 100)} unit="%" color="#fbbf24" />
       </section>
 
@@ -77,7 +79,7 @@ export default function DashboardPage() {
         .panel { background: rgba(30,41,59,0.5); padding: 20px; border-radius: 20px; margin-bottom: 20px; }
         .grid-gauge { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: center; }
         .log-box { height: 200px; overflow-y: auto; color: #94a3b8; }
-        input { background: #1e293b; border: 1px solid #334155; color: white; padding: 5px; border-radius: 5px; }
+        input { background: #1e293b; border: 1px solid #334155; color: white; padding: 5px; border-radius: 5px; width: 80px; }
       `}</style>
     </div>
   );
