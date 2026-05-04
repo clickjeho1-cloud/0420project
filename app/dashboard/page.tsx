@@ -3,74 +3,55 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 
-// 1. Supabase 클라이언트 설정 (반드시 .env.local에 설정되어 있어야 함)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// 타입 정의
-type SensorData = {
-  temperature: number;
-  humidity: number;
-  ec: number;
-  ph: number;
-  waterTemp: number;
-  lux: number;
-};
-
 export default function DashboardPage() {
   const [time, setTime] = useState('');
-  const [sensors, setSensors] = useState<SensorData>({
-    temperature: 0,
-    humidity: 0,
-    ec: 0,
-    ph: 0,
-    waterTemp: 0,
-    lux: 0,
-  });
+  const [historyMode, setHistoryMode] = useState('1H');
+  const [sensors, setSensors] = useState<any>({ temperature: 0, humidity: 0, ec: 0, ph: 0, waterTemp: 0, lux: 0 });
+  const [history, setHistory] = useState<any[]>([]);
+  const [controls, setControls] = useState({ fan: false, pump: false, led: false, heater: false });
 
-  // 1. 실시간 데이터 구독 (Supabase Realtime)
+  // 1. 실시간 데이터 구독 및 초기화
   useEffect(() => {
-    // 초기값 불러오기
-    const fetchInitialData = async () => {
-      const { data } = await supabase
-        .from('sensor_readings')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (data && data.length > 0) {
-        setSensors(data[0] as unknown as SensorData);
+    const fetchData = async () => {
+      const { data } = await supabase.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(80);
+      if (data) {
+        setSensors(data[0] || {});
+        setHistory(data.reverse());
       }
     };
-    fetchInitialData();
+    fetchData();
 
-    // 실시간 채널 구독
     const channel = supabase
       .channel('sensor_readings_channel')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'sensor_readings' },
-        (payload) => {
-          console.log('실시간 데이터 감지:', payload.new);
-          setSensors(payload.new as unknown as SensorData);
-        }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sensor_readings' }, (payload) => {
+        setSensors(payload.new);
+        setHistory(prev => [...prev.slice(-79), payload.new]);
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // 2. 시계 기능
+  // 2. 시계 및 나머지 UI 로직 유지
   useEffect(() => {
-    const updateClock = () => {
+    const timer = setInterval(() => {
       const now = new Date();
       setTime(`${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 ${String(now.getHours()).padStart(2, '0')}시 ${String(now.getMinutes()).padStart(2, '0')}분 ${String(now.getSeconds()).padStart(2, '0')}초`);
-    };
-    const timer = setInterval(updateClock, 1000);
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const toggleControl = async (key: keyof typeof controls) => {
+    const newState = !controls[key];
+    setControls(prev => ({ ...prev, [key]: newState }));
+    // DB 업데이트가 필요하다면 여기에 supabase.from('sensor_readings').insert(...) 등을 추가
+    console.log('MQTT SEND', key, newState);
+  };
 
   return (
     <div className="dashboard">
@@ -80,21 +61,49 @@ export default function DashboardPage() {
       <section className="panel glass-blue">
         <h2>실시간 상황 계기판</h2>
         <div className="grid">
-          <GlassCard title="온도" value={`${sensors.temperature}°C`} />
-          <GlassCard title="습도" value={`${sensors.humidity}%`} />
-          <GlassCard title="EC" value={`${sensors.ec}`} />
-          <GlassCard title="광량" value={`${sensors.lux}`} />
+          <GlassCard title="온도" value={`${sensors.temperature || 0}°C`} />
+          <GlassCard title="습도" value={`${sensors.humidity || 0}%`} />
+          <GlassCard title="EC" value={`${sensors.ec || 0}`} />
+          <GlassCard title="광량" value={`${sensors.lux || 0}`} />
         </div>
       </section>
-      
-      {/* 스타일 및 하위 컴포넌트는 기존 코드 그대로 사용하세요 */}
+
+      <section className="panel glass-wave">
+        <h2>실시간 업다운 파형 분석</h2>
+        <ResponsiveContainer width="100%" height={400}>
+          <AreaChart data={history}>
+            <CartesianGrid stroke="#334155" />
+            <XAxis dataKey="created_at" />
+            <YAxis />
+            <Tooltip />
+            <Area type="monotone" dataKey="temperature" stroke="#ff0000" fill="#ff0000" fillOpacity={0.2} />
+            <Area type="monotone" dataKey="humidity" stroke="#00ff00" fill="#00ff00" fillOpacity={0.2} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </section>
+
+      <section className="panel glass-control">
+        <h2>제어 시스템</h2>
+        <div className="control-grid">
+          {(Object.keys(controls) as Array<keyof typeof controls>).map(key => (
+            <div key={key} className="control-card">
+              <h3>{key.toUpperCase()}</h3>
+              <button className={controls[key] ? 'btn-on' : 'btn-off'} onClick={() => toggleControl(key)}>
+                {controls[key] ? 'TURN OFF' : 'TURN ON'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <style jsx>{`
-        .dashboard { min-height: 100vh; padding: 20px; background: #020617; color: white; }
-        .title { font-size: 42px; color: #38bdf8; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+        .dashboard { min-height: 100vh; padding: 20px; background: linear-gradient(180deg, #020617, #071226); color: white; }
         .panel { padding: 24px; border-radius: 24px; margin-bottom: 25px; background: rgba(255,255,255,0.05); }
-        .glass-card { padding: 22px; border-radius: 20px; background: rgba(255, 255, 255, 0.05); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+        .glass-card { padding: 22px; border-radius: 20px; background: rgba(255,255,255,0.05); }
         .glass-value { margin-top: 12px; font-size: 34px; color: #22d3ee; font-weight: bold; }
+        .btn-on { width: 100%; border: none; padding: 14px; border-radius: 14px; color: white; font-weight: bold; cursor: pointer; background: #dc2626; }
+        .btn-off { width: 100%; border: none; padding: 14px; border-radius: 14px; color: white; font-weight: bold; cursor: pointer; background: #16a34a; }
       `}</style>
     </div>
   );
