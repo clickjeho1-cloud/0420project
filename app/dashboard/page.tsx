@@ -3,20 +3,20 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { ResponsiveContainer, AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 export default function DashboardPage() {
   const [time, setTime] = useState('');
-  const [historyMode, setHistoryMode] = useState('1H');
   const [sensors, setSensors] = useState<any>({ temperature: 0, humidity: 0, ec: 0, ph: 0, waterTemp: 0, lux: 0 });
   const [history, setHistory] = useState<any[]>([]);
   const [controls, setControls] = useState({ fan: false, pump: false, led: false, heater: false });
 
   // 1. 실시간 데이터 구독 및 초기화
   useEffect(() => {
+    // 빌드 에러 방지를 위해 여기서 클라이언트 생성
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+    );
+
     const fetchData = async () => {
       const { data } = await supabase.from('sensor_readings').select('*').order('created_at', { ascending: false }).limit(80);
       if (data) {
@@ -37,7 +37,7 @@ export default function DashboardPage() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // 2. 시계 및 나머지 UI 로직 유지
+  // 2. 시계 기능
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
@@ -46,11 +46,8 @@ export default function DashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const toggleControl = async (key: keyof typeof controls) => {
-    const newState = !controls[key];
-    setControls(prev => ({ ...prev, [key]: newState }));
-    // DB 업데이트가 필요하다면 여기에 supabase.from('sensor_readings').insert(...) 등을 추가
-    console.log('MQTT SEND', key, newState);
+  const toggleControl = (key: keyof typeof controls) => {
+    setControls(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
@@ -104,16 +101,13 @@ export default function DashboardPage() {
         .glass-value { margin-top: 12px; font-size: 34px; color: #22d3ee; font-weight: bold; }
         .btn-on { width: 100%; border: none; padding: 14px; border-radius: 14px; color: white; font-weight: bold; cursor: pointer; background: #dc2626; }
         .btn-off { width: 100%; border: none; padding: 14px; border-radius: 14px; color: white; font-weight: bold; cursor: pointer; background: #16a34a; }
+        .control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+        .control-card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 20px; }
       `}</style>
     </div>
   );
 }
 
 function GlassCard({ title, value }: { title: string; value: string }) {
-  return (
-    <div className="glass-card">
-      <h3>{title}</h3>
-      <div className="glass-value">{value}</div>
-    </div>
-  );
+  return <div className="glass-card"><h3>{title}</h3><div className="glass-value">{value}</div></div>;
 }
