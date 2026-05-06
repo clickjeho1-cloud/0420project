@@ -281,10 +281,12 @@ export default function Page() {
         .nav-links { display: flex; gap: 16px; }
         .nav-link { color: #2563eb; text-decoration: none; font-weight: bold; }
         .nav-link:hover { color: #1d4ed8; }
-        .weather-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; }
-        .weather-panel h3 { margin-top: 0; color: #94a3b8; }
-        .weather-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
-        .weather-item { background: #111827; padding: 12px; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; }
+        .weather-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
+        .weather-panel h3 { margin-top: 0; color: #e2e8f0; font-size: 18px; }
+        .weather-details { background: #111827; padding: 12px; border-radius: 8px; }
+        .weather-info { color: #cbd5e1; line-height: 1.6; }
+        .weather-info strong { color: #f8fafc; font-size: 16px; display: block; margin-bottom: 8px; }
+        .weather-info p { margin: 4px 0; font-size: 14px; }
         .recommendation-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
         .recommendation-panel h2 { margin-top: 0; color: #94a3b8; margin-bottom: 12px; }
         .recommendation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
@@ -357,23 +359,33 @@ function WeatherWidget() {
   useEffect(() => {
     async function fetchWeather() {
       try {
-        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=37.566&longitude=126.978&current=temperature_2m,relative_humidity_2m,cloud_cover,wind_direction_10m&hourly=precipitation_probability&timezone=auto');
+        const res = await fetch('/api/weather');
         const data = await res.json();
-        setWeather({ temp: data.current.temperature_2m, hum: data.current.relative_humidity_2m, cloud: data.current.cloud_cover, windDir: data.current.wind_direction_10m, rainProb: data.hourly.precipitation_probability[0] });
-      } catch (e) {}
+        setWeather(data);
+      } catch (e) {
+        console.error('날씨 정보 로드 실패:', e);
+      }
     }
     fetchWeather();
-    const t = setInterval(fetchWeather, 600000);
+    const t = setInterval(fetchWeather, 600000); // 10분마다 업데이트
     return () => clearInterval(t);
   }, []);
+  
   if (!weather) return <div className="weather-panel">날씨 정보 불러오는 중...</div>;
+  
   return (
     <div className="weather-panel">
-      <h3>📍 서울 날씨 (풍향: {weather.windDir}° / 강수확률: {weather.rainProb}%)</h3>
-      <div className="gauges">
-        <Gauge value={weather.temp} min={-15} max={40} label="온도" unit="°C" color="#ff4d4d" />
-        <Gauge value={weather.hum} min={0} max={100} label="습도" unit="%" color="#4dff88" />
-        <Gauge value={weather.cloud} min={0} max={100} label="구름" unit="%" color="#a855f7" />
+      <h3>📍 {weather.location} 날씨</h3>
+      <div className="weather-details">
+        <div className="weather-info">
+          <strong>{weather.weatherDescription}</strong>
+          <p>온도: {weather.temperature}°C</p>
+          <p>습도: {weather.humidity}%</p>
+          <p>풍속: {weather.windspeed} m/s</p>
+          <p>풍향: {weather.windDirection}°</p>
+          <p>구름: {weather.cloudCover}%</p>
+          <p style={{ fontSize: '12px', color: '#94a3b8' }}>업데이트: {new Date(weather.timestamp).toLocaleTimeString('ko-KR')}</p>
+        </div>
       </div>
     </div>
   );

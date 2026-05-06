@@ -108,7 +108,7 @@ export default function JournalWritePage() {
   const uploadJournalImages = async (files: File[], analyses: ImageAnalysis[]) => {
     const client = supabase;
     if (!client) {
-      throw new Error('Supabase가 설정되어 있지 않습니다.');
+      throw new Error('🔴 Supabase가 설정되어 있지 않습니다. .env.local 파일을 확인하세요.');
     }
 
     const uploaded: UploadedImage[] = [];
@@ -123,6 +123,10 @@ export default function JournalWritePage() {
         });
 
         if (uploadError) {
+          console.error('Supabase Storage 업로드 에러:', uploadError);
+          if (uploadError.message.includes('Bucket not found')) {
+            throw new Error('🔴 [중요] Supabase에서 "journal-images" 스토리지 버킷을 생성해야 합니다.\n1. Supabase 대시보시오드 열기\n2. Storage > Buckets 메뉴\n3. "New bucket" 클릭\n4. 이름: journal-images (정확히)\n5. Public 체크\n6. Create bucket');
+          }
           throw new Error(`이미지 업로드 실패: ${uploadError.message}`);
         }
 
