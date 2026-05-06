@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import mqtt from 'mqtt';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -11,7 +12,7 @@ import {
   Tooltip,
 } from 'recharts';
 
-/* ================= SENSOR TYPE ================= */
+/* ================= SENSOR ================= */
 
 type Sensor = {
   temp: number;
@@ -22,9 +23,7 @@ type Sensor = {
   ppfd: number;
 };
 
-/* ================= SAFE INIT ================= */
-
-const INIT: Sensor = {
+const EMPTY: Sensor = {
   temp: 0,
   hum: 0,
   lux: 0,
@@ -37,9 +36,9 @@ const INIT: Sensor = {
 
 export default function Page() {
 
-  const mqttRef = useRef<any>(null);
+  const clientRef = useRef<any>(null);
 
-  const [sensor, setSensor] = useState<Sensor>(INIT);
+  const [sensor, setSensor] = useState<Sensor>(EMPTY);
   const [history, setHistory] = useState<any[]>([]);
   const [time, setTime] = useState('');
 
@@ -54,21 +53,29 @@ export default function Page() {
     const t = setInterval(() => {
       setTime(new Date().toLocaleString());
     }, 1000);
-
     return () => clearInterval(t);
   }, []);
 
-  /* ================= MQTT SAFE CONNECT ================= */
+  /* ================= NORMALIZER (핵심) ================= */
+  const normalize = (msg: any): Sensor => {
+    return {
+      temp: msg?.values?.temp ?? msg?.temp ?? 0,
+      hum: msg?.values?.hum ?? msg?.hum ?? 0,
+      lux: msg?.values?.lux ?? 0,
+      ec: msg?.values?.ec ?? 0,
+      ph: msg?.values?.ph ?? 0,
+      ppfd: msg?.values?.ppfd ?? 0,
+    };
+  };
+
+  /* ================= MQTT ================= */
   useEffect(() => {
 
-    let client: any;
     let alive = true;
 
     (async () => {
 
-      const mqtt = (await import('mqtt')).default;
-
-      client = mqtt.connect(
+      const mqttClient = mqtt.connect(
         'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
         {
           username: process.env.NEXT_PUBLIC_MQTT_USER || '',
@@ -77,13 +84,13 @@ export default function Page() {
         }
       );
 
-      mqttRef.current = client;
+      clientRef.current = mqttClient;
 
-      client.on('connect', () => {
-        client.subscribe('smartfarm/jeho123/data');
+      mqttClient.on('connect', () => {
+        mqttClient.subscribe('smartfarm/jeho123/data');
       });
 
-      client.on('message', (_: any, payload: any) => {
+      mqttClient.on('message', (_: any, payload: any) => {
 
         if (!alive) return;
 
@@ -91,14 +98,7 @@ export default function Page() {
 
           const msg = JSON.parse(payload.toString());
 
-          const data: Sensor = {
-            temp: msg?.values?.temp ?? 0,
-            hum: msg?.values?.hum ?? 0,
-            lux: msg?.values?.lux ?? 0,
-            ec: msg?.values?.ec ?? 0,
-            ph: msg?.values?.ph ?? 0,
-            ppfd: msg?.values?.ppfd ?? 0,
-          };
+          const data = normalize(msg);
 
           setSensor(data);
 
@@ -110,8 +110,8 @@ export default function Page() {
             },
           ]);
 
-        } catch {
-          // silent fail (SCADA style)
+        } catch (e) {
+          console.log('MQTT PARSE ERROR');
         }
 
       });
@@ -120,7 +120,7 @@ export default function Page() {
 
     return () => {
       alive = false;
-      client?.end?.();
+      clientRef.current?.end?.();
     };
 
   }, []);
@@ -129,26 +129,28 @@ export default function Page() {
   const toggle = (key: keyof typeof control) => {
 
     setControl(prev => {
+
       const next = !prev[key];
 
-      mqttRef.current?.publish(
+      clientRef.current?.publish(
         'smartfarm/jeho123/control',
         JSON.stringify({ device: key, state: next })
       );
 
       return { ...prev, [key]: next };
     });
+
   };
 
-  /* ================= SAFE VALUE ================= */
-  const v = sensor ?? INIT;
+  /* ================= SAFE DATA ================= */
+  const v = sensor ?? EMPTY;
 
   return (
     <div className="scada">
 
-      {/* HEADER (LOCKED) */}
+      {/* HEADER */}
       <div className="header">
-        <h1>GLOVERA SMART FARM 대시보드</h1>
+        <h1>GLOVERA SMART FARM SCADA</h1>
         <div>{time}</div>
       </div>
 
@@ -164,11 +166,13 @@ export default function Page() {
 
       </div>
 
-      {/* MAIN CHART (NO BREAK) */}
+      {/* GRAPH */}
       <div className="chart">
 
         <ResponsiveContainer width="100%" height={320}>
-          <AreaChart data={history || []}>
+          <AreaChart
+            data={history.length ? history : [{ time: '--', temp: 0, hum: 0, lux: 0, ec: 0, ph: 0, ppfd: 0 }]}
+          >
 
             <CartesianGrid stroke="#1f2937" />
             <XAxis dataKey="time" />
@@ -186,7 +190,7 @@ export default function Page() {
 
       </div>
 
-      {/* CONTROL SYSTEM (ALWAYS VISIBLE) */}
+      {/* CONTROL */}
       <div className="control">
 
         <button onClick={() => toggle('pump')}>
@@ -203,12 +207,12 @@ export default function Page() {
 
       </div>
 
-      {/* FOOTER FIXED */}
+      {/* FOOTER */}
       <div className="footer">
         copyright@orginated jhk in 2026
       </div>
 
-      {/* STYLE (SCADA CLEAN + STABLE) */}
+      {/* STYLE */}
       <style jsx>{`
 
         .scada {
@@ -251,7 +255,6 @@ export default function Page() {
           background: #0b1220;
           border: 1px solid #334155;
           color: white;
-          cursor: pointer;
         }
 
         .footer {
