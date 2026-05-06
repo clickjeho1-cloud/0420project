@@ -1,27 +1,45 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import mqtt from 'mqtt';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from 'recharts';
 
-/* ================= TYPES (ESP REAL FORMAT) ================= */
+/* ================= ESP STRUCT ================= */
 
-type EspPayload = {
+type EspData = {
   time: number;
   values: {
     temp: number;
     hum: number;
+    ec: number;
+    ph: number;
+    lux: number;
+    ppfd: number;
+    rpm: number;
   };
 };
 
 /* ================= PAGE ================= */
 
-export default function DashboardPage() {
+export default function Page() {
 
+  const clientRef = useRef<mqtt.MqttClient | null>(null);
+
+  const [esp, setEsp] = useState<EspData | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
   const [time, setTime] = useState('');
-  const [esp, setEsp] = useState<EspPayload | null>(null);
 
-  const [weather, setWeather] = useState({
-    temp: '--',
-    wind: '--',
+  const [controls, setControls] = useState({
+    pump: false,
+    led: false,
   });
 
   /* ================= CLOCK ================= */
@@ -29,174 +47,256 @@ export default function DashboardPage() {
     const t = setInterval(() => {
       setTime(new Date().toLocaleString());
     }, 1000);
-
     return () => clearInterval(t);
   }, []);
 
-  /* ================= WEATHER (SEOUL ONLY KEEP) ================= */
+  /* ================= MQTT ================= */
   useEffect(() => {
-    async function loadWeather() {
-      try {
-        const res = await fetch('/api/weather', { cache: 'no-store' });
-        const data = await res.json();
 
-        setWeather({
-          temp: `${data.temperature}°C`,
-          wind: `${data.windspeed} km/h`,
-        });
-
-      } catch {
-        setWeather({
-          temp: '--',
-          wind: '--',
-        });
+    const client = mqtt.connect(
+      'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
+      {
+        username: process.env.NEXT_PUBLIC_MQTT_USER || '',
+        password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
       }
-    }
+    );
 
-    loadWeather();
-    const t = setInterval(loadWeather, 60000);
-    return () => clearInterval(t);
-  }, []);
+    clientRef.current = client;
 
-  /* ================= ESP DATA (REAL STRUCTURE ONLY) ================= */
-  useEffect(() => {
+    client.on('connect', () => {
+      client.subscribe('smartfarm/jeho123/data');
+    });
 
-    const t = setInterval(() => {
+    client.on('message', (_t, payload: Buffer) => {
 
-      // 🔥 여기 실제 MQTT 붙이면 됨 (현재는 구조 맞추기용)
-      const mock: EspPayload = {
-        time: Date.now(),
+      const msg = JSON.parse(payload.toString());
+
+      const data: EspData = {
+        time: msg.time,
         values: {
-          temp: 23.5 + Math.random(),
-          hum: 34 + Math.random() * 2,
+          temp: msg.values.temp,
+          hum: msg.values.hum,
+          ec: msg.values.ec ?? 2.0,
+          ph: msg.values.ph ?? 6.5,
+          lux: msg.values.lux ?? 30000,
+          ppfd: msg.values.ppfd ?? 400,
+          rpm: msg.values.rpm ?? 1200,
         },
       };
 
-      setEsp(mock);
+      setEsp(data);
 
-    }, 2000);
+      setHistory(prev => [
+        ...prev.slice(-120),
+        {
+          time: new Date().toLocaleTimeString().slice(0, 8),
+          temp: data.values.temp,
+          hum: data.values.hum,
+          ec: data.values.ec,
+          ph: data.values.ph,
+          lux: data.values.lux,
+          ppfd: data.values.ppfd,
+        },
+      ]);
+    });
 
-    return () => clearInterval(t);
+    return () => client.end();
 
   }, []);
 
+  /* ================= STATUS COLORS ================= */
+
+  const pumpColor = controls.pump ? '#22c55e' : '#ef4444';
+
+  const ecStatus =
+    (esp?.values.ec ?? 0) < 1.5
+      ? 'ok'
+      : (esp?.values.ec ?? 0) < 3
+      ? 'warn'
+      : 'danger';
+
+  const phStatus =
+    (esp?.values.ph ?? 0) > 5.8 && (esp?.values.ph ?? 0) < 7.2
+      ? 'ok'
+      : 'warn';
+
   return (
-    <div className="dashboard">
+    <div className="scada">
 
       {/* HEADER */}
-      <div className="top">
-        <h1>SMART FARM SCADA (SEOUL)</h1>
+      <div className="topbar">
+        <h1>INDUSTRIAL SCADA DASHBOARD</h1>
         <div>{time}</div>
       </div>
 
-      {/* MAIN GRID */}
+      {/* STATUS GRID */}
       <div className="grid">
 
-        {/* WEATHER */}
-        <div className="panel">
-          <h3>SEOUL WEATHER</h3>
-          <div>Temp: {weather.temp}</div>
-          <div>Wind: {weather.wind}</div>
-        </div>
+        <Box label="TEMP" value={esp?.values.temp ?? '--'} unit="°C" />
+        <Box label="HUM" value={esp?.values.hum ?? '--'} unit="%" />
+        <Box label="EC" value={esp?.values.ec ?? '--'} color={ecStatus} />
+        <Box label="PH" value={esp?.values.ph ?? '--'} color={phStatus} />
+        <Box label="PPFD" value={esp?.values.ppfd ?? '--'} />
+        <Box label="LUX" value={esp?.values.lux ?? '--'} />
 
-        {/* ESP REAL DATA */}
-        <div className="panel center">
-          <h3>ESP32 LIVE DATA</h3>
+      </div>
 
-          <div className="big">
-            TEMP: {esp?.values.temp.toFixed(2) ?? '--'} °C
-          </div>
+      {/* PUMP GAUGE (RPM STYLE) */}
+      <div className="gauge">
 
-          <div className="big">
-            HUM: {esp?.values.hum.toFixed(2) ?? '--'} %
-          </div>
+        <div className="needle"
+          style={{
+            transform: `rotate(${(esp?.values.rpm ?? 0) / 20}deg)`,
+          }}
+        />
 
-        </div>
-
-        {/* STATUS */}
-        <div className="panel">
-          <h3>STATUS</h3>
-
-          <div className={
-            (esp?.values.temp ?? 0) > 25
-              ? 'danger'
-              : 'ok'
-          }>
-            TEMP STATUS
-          </div>
-
-          <div className={
-            (esp?.values.hum ?? 0) < 30
-              ? 'warn'
-              : 'ok'
-          }>
-            HUM STATUS
-          </div>
-
+        <div className="rpm">
+          RPM: {esp?.values.rpm ?? 0}
         </div>
 
       </div>
 
-      {/* FOOTER */}
-      <div className="footer">
-        LIVE ESP32 + SEOUL WEATHER SCADA SYSTEM
+      {/* REALTIME GRAPH */}
+      <div className="chart">
+
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={history}>
+            <CartesianGrid stroke="#1f2937" />
+            <XAxis dataKey="time" />
+            <YAxis />
+            <Tooltip />
+
+            <Area dataKey="temp" stroke="#ff4d4d" />
+            <Area dataKey="hum" stroke="#4dff88" />
+            <Area dataKey="ec" stroke="#4da6ff" />
+            <Area dataKey="ph" stroke="#ffd24d" />
+            <Area dataKey="ppfd" stroke="#a855f7" />
+
+          </AreaChart>
+        </ResponsiveContainer>
+
+      </div>
+
+      {/* CONTROL PANEL */}
+      <div className="controls">
+
+        <button
+          onClick={() =>
+            setControls(p => ({ ...p, pump: !p.pump }))
+          }
+          style={{ borderColor: pumpColor }}
+        >
+          PUMP {controls.pump ? 'ON' : 'OFF'}
+        </button>
+
+        <button
+          onClick={() =>
+            setControls(p => ({ ...p, led: !p.led }))
+          }
+        >
+          LED {controls.led ? 'ON' : 'OFF'}
+        </button>
+
       </div>
 
       {/* STYLE */}
       <style jsx>{`
 
-        .dashboard {
+        .scada {
           background: #05070f;
           color: white;
+          padding: 16px;
           min-height: 100vh;
-          padding: 20px;
-          font-family: monospace;
         }
 
-        .top {
+        .topbar {
           display: flex;
           justify-content: space-between;
           border-bottom: 1px solid #1f2937;
-          padding-bottom: 10px;
         }
 
         .grid {
           display: grid;
-          grid-template-columns: 1fr 2fr 1fr;
-          gap: 12px;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 10px;
+          margin-top: 12px;
+        }
+
+        .gauge {
+          margin-top: 20px;
+          width: 200px;
+          height: 200px;
+          border-radius: 50%;
+          border: 4px solid #1f2937;
+          position: relative;
+        }
+
+        .needle {
+          width: 2px;
+          height: 90px;
+          background: red;
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform-origin: bottom;
+        }
+
+        .rpm {
+          position: absolute;
+          bottom: 10px;
+          width: 100%;
+          text-align: center;
+        }
+
+        .chart {
           margin-top: 20px;
         }
 
-        .panel {
+        .controls {
+          margin-top: 20px;
+          display: flex;
+          gap: 10px;
+        }
+
+        button {
+          padding: 10px;
+          border: 1px solid #334155;
           background: #0b1220;
-          padding: 16px;
-          border-radius: 10px;
-          border: 1px solid #1f2937;
-        }
-
-        .center {
-          text-align: center;
-        }
-
-        .big {
-          font-size: 24px;
-          margin-top: 10px;
-          color: #22d3ee;
-        }
-
-        .ok { color: #22c55e; }
-        .warn { color: #facc15; }
-        .danger { color: #ef4444; }
-
-        .footer {
-          margin-top: 20px;
-          text-align: center;
-          font-size: 12px;
-          color: #64748b;
+          color: white;
         }
 
       `}</style>
 
+    </div>
+  );
+}
+
+/* ================= BOX ================= */
+
+function Box({
+  label,
+  value,
+  unit,
+  color,
+}: any) {
+  return (
+    <div style={{
+      padding: 10,
+      background: '#0b1220',
+      border: '1px solid #1f2937',
+      textAlign: 'center'
+    }}>
+      <div>{label}</div>
+      <div style={{
+        color:
+          color === 'danger'
+            ? '#ef4444'
+            : color === 'warn'
+            ? '#facc15'
+            : '#22c55e'
+      }}>
+        {value}{unit}
+      </div>
     </div>
   );
 }
