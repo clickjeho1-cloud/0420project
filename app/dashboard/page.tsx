@@ -238,6 +238,39 @@ export default function Page() {
 
       </div>
 
+      {/* LOG HISTORY */}
+      <div className="log-history">
+        <h3>📋 실시간 로그 히스토리</h3>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>시간</th>
+                <th>온도 (°C)</th>
+                <th>습도 (%)</th>
+                <th>EC (mS/cm)</th>
+                <th>pH</th>
+                <th>PPFD (µmol)</th>
+                <th>양액온도 (°C)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...history].reverse().map((item, idx) => (
+                <tr key={idx}>
+                  <td>{item.time}</td>
+                  <td>{item.temp}</td>
+                  <td>{item.hum}</td>
+                  <td>{item.ec}</td>
+                  <td>{item.ph}</td>
+                  <td>{item.ppfd}</td>
+                  <td>{item.nutTemp}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* CONTROL */}
       <div className="control">
 
@@ -346,6 +379,50 @@ export default function Page() {
           background: #1e293b;
           color: white;
           border-color: #64748b;
+        }
+
+        .log-history {
+          margin-top: 20px;
+          background: #0b1220;
+          padding: 16px;
+          border: 1px solid #1f2937;
+        }
+
+        .log-history h3 {
+          margin-top: 0;
+          color: #94a3b8;
+          margin-bottom: 12px;
+        }
+
+        .table-wrapper {
+          max-height: 250px;
+          overflow-y: auto;
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: center;
+          font-size: 14px;
+        }
+
+        th {
+          position: sticky;
+          top: 0;
+          background: #1e293b;
+          color: #f8fafc;
+          padding: 10px;
+          border-bottom: 2px solid #334155;
+        }
+
+        td {
+          padding: 8px 10px;
+          border-bottom: 1px solid #1f2937;
+          color: #cbd5e1;
+        }
+
+        tr:hover td {
+          background: #1e293b;
         }
 
         .control {
