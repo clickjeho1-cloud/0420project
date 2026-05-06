@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import mqtt from 'mqtt';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -12,7 +11,7 @@ import {
   Tooltip,
 } from 'recharts';
 
-/* ================= ESP STRUCT ================= */
+/* ================= TYPES ================= */
 
 type EspData = {
   time: number;
@@ -31,7 +30,7 @@ type EspData = {
 
 export default function Page() {
 
-  const clientRef = useRef<mqtt.MqttClient | null>(null);
+  const mqttRef = useRef<any>(null);
 
   const [esp, setEsp] = useState<EspData | null>(null);
   const [history, setHistory] = useState<any[]>([]);
@@ -47,120 +46,138 @@ export default function Page() {
     const t = setInterval(() => {
       setTime(new Date().toLocaleString());
     }, 1000);
+
     return () => clearInterval(t);
   }, []);
 
-  /* ================= MQTT ================= */
+  /* ================= MQTT (VERCEL SAFE DYNAMIC IMPORT) ================= */
   useEffect(() => {
 
-    const client = mqtt.connect(
-      'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
-      {
-        username: process.env.NEXT_PUBLIC_MQTT_USER || '',
-        password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
-      }
-    );
+    let client: any;
 
-    clientRef.current = client;
+    const connect = async () => {
 
-    client.on('connect', () => {
-      client.subscribe('smartfarm/jeho123/data');
-    });
+      const mqtt = (await import('mqtt')).default;
 
-    client.on('message', (_t, payload: Buffer) => {
-
-      const msg = JSON.parse(payload.toString());
-
-      const data: EspData = {
-        time: msg.time,
-        values: {
-          temp: msg.values.temp,
-          hum: msg.values.hum,
-          ec: msg.values.ec ?? 2.0,
-          ph: msg.values.ph ?? 6.5,
-          lux: msg.values.lux ?? 30000,
-          ppfd: msg.values.ppfd ?? 400,
-          rpm: msg.values.rpm ?? 1200,
-        },
-      };
-
-      setEsp(data);
-
-      setHistory(prev => [
-        ...prev.slice(-120),
+      client = mqtt.connect(
+        'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
         {
-          time: new Date().toLocaleTimeString().slice(0, 8),
-          temp: data.values.temp,
-          hum: data.values.hum,
-          ec: data.values.ec,
-          ph: data.values.ph,
-          lux: data.values.lux,
-          ppfd: data.values.ppfd,
-        },
-      ]);
-    });
+          username: process.env.NEXT_PUBLIC_MQTT_USER || '',
+          password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
+          reconnectPeriod: 2000,
+        }
+      );
 
-    return () => client.end();
+      mqttRef.current = client;
+
+      client.on('connect', () => {
+        client.subscribe('smartfarm/jeho123/data');
+      });
+
+      client.on('message', (_topic: string, payload: Buffer) => {
+
+        try {
+
+          const msg = JSON.parse(payload.toString());
+
+          const data: EspData = {
+            time: msg.time,
+            values: {
+              temp: msg.values?.temp ?? 0,
+              hum: msg.values?.hum ?? 0,
+              ec: msg.values?.ec ?? 0,
+              ph: msg.values?.ph ?? 0,
+              lux: msg.values?.lux ?? 0,
+              ppfd: msg.values?.ppfd ?? 0,
+              rpm: msg.values?.rpm ?? 0,
+            },
+          };
+
+          setEsp(data);
+
+          setHistory(prev => [
+            ...prev.slice(-100),
+            {
+              time: new Date().toLocaleTimeString().slice(0, 8),
+              temp: data.values.temp,
+              hum: data.values.hum,
+              ec: data.values.ec,
+              ph: data.values.ph,
+              lux: data.values.lux,
+              ppfd: data.values.ppfd,
+            },
+          ]);
+
+        } catch (e) {
+          console.log('MQTT PARSE ERROR');
+        }
+      });
+
+    };
+
+    connect();
+
+    return () => {
+      client?.end?.();
+    };
 
   }, []);
 
-  /* ================= STATUS COLORS ================= */
+  /* ================= CONTROL ================= */
+  const toggle = (key: keyof typeof controls) => {
+    setControls(prev => {
+      const next = !prev[key];
 
-  const pumpColor = controls.pump ? '#22c55e' : '#ef4444';
+      mqttRef.current?.publish(
+        'smartfarm/jeho123/control',
+        JSON.stringify({ device: key, state: next })
+      );
 
-  const ecStatus =
-    (esp?.values.ec ?? 0) < 1.5
-      ? 'ok'
-      : (esp?.values.ec ?? 0) < 3
-      ? 'warn'
-      : 'danger';
+      return { ...prev, [key]: next };
+    });
+  };
 
-  const phStatus =
-    (esp?.values.ph ?? 0) > 5.8 && (esp?.values.ph ?? 0) < 7.2
-      ? 'ok'
-      : 'warn';
+  /* ================= SAFE VALUES ================= */
+  const v = esp?.values;
 
   return (
     <div className="scada">
 
       {/* HEADER */}
       <div className="topbar">
-        <h1>INDUSTRIAL SCADA DASHBOARD</h1>
+        <h1>SCADA SYSTEM</h1>
         <div>{time}</div>
       </div>
 
       {/* STATUS GRID */}
       <div className="grid">
 
-        <Box label="TEMP" value={esp?.values.temp ?? '--'} unit="°C" />
-        <Box label="HUM" value={esp?.values.hum ?? '--'} unit="%" />
-        <Box label="EC" value={esp?.values.ec ?? '--'} color={ecStatus} />
-        <Box label="PH" value={esp?.values.ph ?? '--'} color={phStatus} />
-        <Box label="PPFD" value={esp?.values.ppfd ?? '--'} />
-        <Box label="LUX" value={esp?.values.lux ?? '--'} />
+        <Box label="TEMP" value={v?.temp ?? '--'} unit="°C" />
+        <Box label="HUM" value={v?.hum ?? '--'} unit="%" />
+        <Box label="EC" value={v?.ec ?? '--'} />
+        <Box label="PH" value={v?.ph ?? '--'} />
+        <Box label="PPFD" value={v?.ppfd ?? '--'} />
+        <Box label="LUX" value={v?.lux ?? '--'} />
 
       </div>
 
-      {/* PUMP GAUGE (RPM STYLE) */}
+      {/* RPM GAUGE */}
       <div className="gauge">
-
         <div className="needle"
           style={{
-            transform: `rotate(${(esp?.values.rpm ?? 0) / 20}deg)`,
+            transform: `rotate(${(v?.rpm ?? 0) / 20}deg)`
           }}
         />
-
         <div className="rpm">
-          RPM: {esp?.values.rpm ?? 0}
+          RPM: {v?.rpm ?? 0}
         </div>
-
       </div>
 
-      {/* REALTIME GRAPH */}
+      {/* CHART (SAFE DATA ONLY) */}
       <div className="chart">
 
         <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={history}>
+          <AreaChart data={history || []}>
             <CartesianGrid stroke="#1f2937" />
             <XAxis dataKey="time" />
             <YAxis />
@@ -177,23 +194,14 @@ export default function Page() {
 
       </div>
 
-      {/* CONTROL PANEL */}
+      {/* CONTROL */}
       <div className="controls">
 
-        <button
-          onClick={() =>
-            setControls(p => ({ ...p, pump: !p.pump }))
-          }
-          style={{ borderColor: pumpColor }}
-        >
+        <button onClick={() => toggle('pump')}>
           PUMP {controls.pump ? 'ON' : 'OFF'}
         </button>
 
-        <button
-          onClick={() =>
-            setControls(p => ({ ...p, led: !p.led }))
-          }
-        >
+        <button onClick={() => toggle('led')}>
           LED {controls.led ? 'ON' : 'OFF'}
         </button>
 
@@ -219,23 +227,23 @@ export default function Page() {
           display: grid;
           grid-template-columns: repeat(6, 1fr);
           gap: 10px;
-          margin-top: 12px;
+          margin-top: 10px;
         }
 
         .gauge {
           margin-top: 20px;
-          width: 200px;
-          height: 200px;
+          width: 180px;
+          height: 180px;
           border-radius: 50%;
           border: 4px solid #1f2937;
           position: relative;
         }
 
         .needle {
-          width: 2px;
-          height: 90px;
-          background: red;
           position: absolute;
+          width: 2px;
+          height: 80px;
+          background: red;
           left: 50%;
           top: 50%;
           transform-origin: bottom;
@@ -259,10 +267,10 @@ export default function Page() {
         }
 
         button {
-          padding: 10px;
-          border: 1px solid #334155;
           background: #0b1220;
+          border: 1px solid #334155;
           color: white;
+          padding: 10px;
         }
 
       `}</style>
@@ -273,28 +281,16 @@ export default function Page() {
 
 /* ================= BOX ================= */
 
-function Box({
-  label,
-  value,
-  unit,
-  color,
-}: any) {
+function Box({ label, value, unit }: any) {
   return (
     <div style={{
-      padding: 10,
       background: '#0b1220',
+      padding: 10,
       border: '1px solid #1f2937',
       textAlign: 'center'
     }}>
-      <div>{label}</div>
-      <div style={{
-        color:
-          color === 'danger'
-            ? '#ef4444'
-            : color === 'warn'
-            ? '#facc15'
-            : '#22c55e'
-      }}>
+      <div style={{ fontSize: 10 }}>{label}</div>
+      <div>
         {value}{unit}
       </div>
     </div>
