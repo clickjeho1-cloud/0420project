@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 /* ================= TYPES ================= */
+type JournalImage = {
+  id: number;
+  public_url: string;
+  file_name: string;
+};
+
 type JournalEntry = {
   id: number;
   date: string;
@@ -11,6 +17,7 @@ type JournalEntry = {
   leafSize: number | null;
   waterAmount: number | null;
   notes: string;
+  journal_images?: JournalImage[];
 };
 
 /* ================= PAGE ================= */
@@ -61,6 +68,7 @@ export default function JournalListPage() {
                 <th>엽면적 (cm)</th>
                 <th>관수량 (L)</th>
                 <th className="notes-col">특이사항</th>
+                <th>사진</th>
               </tr>
             </thead>
             <tbody>
@@ -71,6 +79,17 @@ export default function JournalListPage() {
                   <td>{journal.leafSize || '-'}</td>
                   <td>{journal.waterAmount || '-'}</td>
                   <td className="notes-col">{journal.notes || '-'}</td>
+                  <td className="images-col">
+                    {journal.journal_images && journal.journal_images.length > 0 ? (
+                      <div className="thumbnail-row">
+                        {journal.journal_images.map((img) => (
+                          <img key={img.id} src={img.public_url} alt={img.file_name} />
+                        ))}
+                      </div>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -89,6 +108,9 @@ export default function JournalListPage() {
         .loading, .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 18px; }
         
         .table-wrapper { background: #0b1220; border: 1px solid #1f2937; border-radius: 8px; overflow: hidden; }
+        .thumbnail-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+        .thumbnail-row img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #334155; }
+        .images-col { min-width: 140px; }
         table { width: 100%; border-collapse: collapse; text-align: center; }
         th { background: #1e293b; color: #f8fafc; padding: 14px; font-weight: bold; border-bottom: 2px solid #334155; }
         td { padding: 14px; border-bottom: 1px solid #1f2937; color: #cbd5e1; }

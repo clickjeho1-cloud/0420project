@@ -28,6 +28,17 @@ type Sensor = {
 
 type HistoryItem = Sensor & { time: string };
 
+type Suggestion = {
+  temp: string;
+  humidity: string;
+  ec: string;
+  ppfd: string;
+  fan: string;
+  pump: string;
+  light: string;
+  note: string;
+};
+
 const EMPTY: Sensor = { temp: 0, hum: 0, ec: 0, ph: 0, ppfd: 0, nutTemp: 0 };
 
 /* ================= HELPERS ================= */
@@ -48,6 +59,8 @@ export default function Page() {
   const [status, setStatus] = useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
   const [timeRange, setTimeRange] = useState<'1h' | '8h' | '24h' | '7d'>('1h');
   const [control, setControl] = useState({ pump: false, fan: false, led: false });
+  const [recommendation, setRecommendation] = useState<Suggestion | null>(null);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
 
   /* ================= MQTT ================= */
   useEffect(() => {
@@ -116,6 +129,37 @@ export default function Page() {
   const maxTemp = temps.length ? Math.max(...temps) : 0;
   const avgTemp = temps.length ? (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1) : 0;
 
+  useEffect(() => {
+    async function fetchSuggestion() {
+      if (!history.length) return;
+      setRecommendationLoading(true);
+      try {
+        const res = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            temp: v.temp,
+            hum: v.hum,
+            ec: v.ec,
+            ph: v.ph,
+            ppfd: v.ppfd,
+            nutTemp: v.nutTemp,
+          }),
+        });
+        const result = await res.json();
+        if (result.ok) {
+          setRecommendation(result.suggestion);
+        }
+      } catch (error) {
+        console.error('추천 정보 로드 실패:', error);
+      } finally {
+        setRecommendationLoading(false);
+      }
+    }
+
+    fetchSuggestion();
+  }, [history, v.temp, v.hum, v.ec, v.ph, v.ppfd, v.nutTemp]);
+
   return (
     <div className="scada">
       <div className="header">
@@ -128,6 +172,43 @@ export default function Page() {
       </div>
 
       <WeatherWidget />
+
+      <div className="recommendation-panel">
+        <h2>추천 제어값</h2>
+        {recommendationLoading ? (
+          <p>추천값을 계산 중입니다...</p>
+        ) : recommendation ? (
+          <div className="recommendation-grid">
+            <div className="recommendation-card">
+              <strong>온도</strong>
+              <p>{recommendation.temp}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>습도</strong>
+              <p>{recommendation.humidity}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>EC</strong>
+              <p>{recommendation.ec}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>광량</strong>
+              <p>{recommendation.ppfd}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>팬</strong>
+              <p>{recommendation.fan}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>펌프</strong>
+              <p>{recommendation.pump}</p>
+            </div>
+          </div>
+        ) : (
+          <p>데이터가 부족하여 추천 정보를 표시할 수 없습니다.</p>
+        )}
+        {recommendation?.note ? <p className="recommendation-note">{recommendation.note}</p> : null}
+      </div>
 
       <div className="grid">
         <div className="gauge-box"><Gauge value={v.ec} min={0} max={5} label="EC" unit="mS/cm" color="#22c55e" /></div>
@@ -202,7 +283,15 @@ export default function Page() {
         .nav-link:hover { color: #1d4ed8; }
         .weather-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; }
         .weather-panel h3 { margin-top: 0; color: #94a3b8; }
-        .gauges { display: flex; justify-content: space-around; }
+        .weather-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
+        .weather-item { background: #111827; padding: 12px; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; }
+        .recommendation-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
+        .recommendation-panel h2 { margin-top: 0; color: #94a3b8; margin-bottom: 12px; }
+        .recommendation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+        .recommendation-card { background: #111827; padding: 14px; border: 1px solid #334155; border-radius: 10px; color: #e2e8f0; }
+        .recommendation-card strong { display: block; margin-bottom: 8px; color: #f8fafc; }
+        .recommendation-note { color: #c7d2fe; margin-top: 16px; }
+        .gauges { display: flex; justify-content: space-around; } 
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
         .chart { margin-top: 20px; background: #0b1220; padding: 16px; border: 1px solid #1f2937; }
         .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
