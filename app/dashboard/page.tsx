@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from 'recharts';
 
-/* ================= TYPES ================= */
+/* ================= TYPES (STRICT SAFE) ================= */
 
 type SensorData = {
   temperature: number;
@@ -24,13 +24,21 @@ type SensorData = {
   rpm: number;
 };
 
+type AlarmLevel = 'NORMAL' | 'WARNING' | 'CRITICAL';
+
 type EventLog = {
   id: string;
   time: string;
-  type: 'NORMAL' | 'WARNING' | 'CRITICAL';
+  type: AlarmLevel;
   tag: string;
   value: number;
   message: string;
+};
+
+type CardProps = {
+  label: string;
+  value: string | number;
+  color?: string;
 };
 
 /* ================= PAGE ================= */
@@ -38,11 +46,11 @@ type EventLog = {
 export default function DashboardPage() {
   const mqttRef = useRef<mqtt.MqttClient | null>(null);
 
-  const [time, setTime] = useState('');
+  const [time, setTime] = useState<string>('');
+  const [history, setHistory] = useState<SensorData[]>([]);
   const [events, setEvents] = useState<EventLog[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
 
-  const [controls, setControls] = useState({
+  const [controls, setControls] = useState<Record<string, boolean>>({
     fan: false,
     pump: false,
     led: false,
@@ -67,7 +75,7 @@ export default function DashboardPage() {
     return () => clearInterval(t);
   }, []);
 
-  /* ================= MQTT ================= */
+  /* ================= MQTT SAFE ================= */
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -86,7 +94,7 @@ export default function DashboardPage() {
       client.subscribe('smartfarm/jeho123/data');
     });
 
-    client.on('message', (_t, payload) => {
+    client.on('message', (_topic: string, payload: Buffer) => {
       const msg = JSON.parse(payload.toString());
 
       const data: SensorData = {
@@ -101,42 +109,39 @@ export default function DashboardPage() {
 
       setSensors(data);
 
-      /* ================= HISTORY ================= */
-      setHistory(prev => [
-        ...prev.slice(-120),
-        {
-          time: new Date().toLocaleTimeString(),
-          ...data,
-        },
-      ]);
+      setHistory(prev => [...prev.slice(-120), data]);
 
       /* ================= SCADA EVENT ENGINE ================= */
-      const newEvents: EventLog[] = [];
+      const createLevel = (v: number, low: number, high: number): AlarmLevel => {
+        if (v < low || v > high) return 'CRITICAL';
+        if (v < low * 1.2 || v > high * 0.8) return 'WARNING';
+        return 'NORMAL';
+      };
 
-      const ecLevel = data.ec < 1.5 ? 'NORMAL' : data.ec < 3 ? 'WARNING' : 'CRITICAL';
-      const phLevel = data.ph >= 6 && data.ph <= 7 ? 'NORMAL'
-                    : data.ph >= 5.5 && data.ph <= 7.5 ? 'WARNING'
-                    : 'CRITICAL';
+      const ecLevel = createLevel(data.ec, 1.5, 3.0);
+      const phLevel = createLevel(data.ph, 6, 7);
+
+      const newEvents: EventLog[] = [];
 
       if (ecLevel !== 'NORMAL') {
         newEvents.push({
-          id: crypto.randomUUID(),
+          id: cryptoId(),
           time: new Date().toLocaleTimeString(),
           type: ecLevel,
           tag: 'EC',
           value: data.ec,
-          message: `EC anomaly detected: ${data.ec}`,
+          message: `EC anomaly: ${data.ec}`,
         });
       }
 
       if (phLevel !== 'NORMAL') {
         newEvents.push({
-          id: crypto.randomUUID(),
+          id: cryptoId(),
           time: new Date().toLocaleTimeString(),
           type: phLevel,
           tag: 'PH',
           value: data.ph,
-          message: `PH anomaly detected: ${data.ph}`,
+          message: `PH anomaly: ${data.ph}`,
         });
       }
 
@@ -149,7 +154,7 @@ export default function DashboardPage() {
   }, []);
 
   /* ================= CONTROL ================= */
-  const toggleControl = (key: keyof typeof controls) => {
+  const toggleControl = (key: string) => {
     setControls(prev => {
       const next = !prev[key];
 
@@ -162,7 +167,7 @@ export default function DashboardPage() {
     });
   };
 
-  /* ================= SCADA COLORS ================= */
+  /* ================= COLORS ================= */
   const ecColor =
     sensors.ec < 1.5 ? 'text-green-400' :
     sensors.ec < 3 ? 'text-yellow-400' : 'text-red-500';
@@ -177,33 +182,31 @@ export default function DashboardPage() {
 
       {/* HEADER */}
       <div className="border-b border-gray-700 pb-2">
-        <h1 className="text-lg font-bold tracking-widest">
-          SCADA CONTROL CENTER
-        </h1>
+        <h1 className="text-lg font-bold">SCADA CONTROL SYSTEM</h1>
         <div className="text-xs opacity-60">{time}</div>
       </div>
 
-      {/* STATUS GRID */}
-      <div className="grid grid-cols-6 gap-2 mt-4 text-sm">
+      {/* STATUS */}
+      <div className="grid grid-cols-6 gap-2 mt-4">
 
-        <Card label="TEMP" value={sensors.temperature} />
-        <Card label="HUMID" value={sensors.humidity} />
+        <Card label="TEMP" value={`${sensors.temperature}°C`} />
+        <Card label="HUMID" value={`${sensors.humidity}%`} />
         <Card label="EC" value={sensors.ec} color={ecColor} />
         <Card label="PH" value={sensors.ph} color={phColor} />
-        <Card label="WATER" value={sensors.waterTemp} />
+        <Card label="WATER" value={`${sensors.waterTemp}°C`} />
         <Card label="LUX" value={sensors.lux} />
 
       </div>
 
-      {/* RPM GAUGE */}
+      {/* RPM */}
       <div className="mt-6 bg-[#0b1220] border border-gray-700 p-4">
-        <h2 className="text-xs mb-2 opacity-70">PUMP RPM</h2>
+        <h2 className="text-xs opacity-70">PUMP RPM</h2>
 
         <div className="relative w-44 h-44 mx-auto">
           <div className="absolute inset-0 rounded-full border-4 border-gray-700" />
 
           <div
-            className="absolute left-1/2 top-1/2 w-1 h-20 bg-red-500 origin-bottom transition-transform duration-500"
+            className="absolute left-1/2 top-1/2 w-1 h-20 bg-red-500 origin-bottom transition-transform duration-300"
             style={{
               transform: `translate(-50%, -100%) rotate(${(sensors.rpm / 4000) * 180 - 90}deg)`
             }}
@@ -219,7 +222,7 @@ export default function DashboardPage() {
       <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
         <h2 className="text-xs mb-2">REALTIME SIGNAL</h2>
 
-        <ResponsiveContainer width="100%" height={260}>
+        <ResponsiveContainer width="100%" height={250}>
           <AreaChart data={history}>
             <CartesianGrid stroke="#1f2937" />
             <XAxis dataKey="time" />
@@ -236,17 +239,21 @@ export default function DashboardPage() {
 
       {/* EVENT LOG */}
       <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
-        <h2 className="text-xs mb-2">ALARM EVENT LOG</h2>
+        <h2 className="text-xs mb-2">ALARM LOG</h2>
 
-        <div className="space-y-1 max-h-40 overflow-auto text-xs">
+        <div className="text-xs space-y-1 max-h-40 overflow-auto">
           {events.map(e => (
-            <div key={e.id} className={`
-              p-1 border-l-2
-              ${e.type === 'CRITICAL' ? 'border-red-500 text-red-400' :
-                e.type === 'WARNING' ? 'border-yellow-400 text-yellow-300' :
-                'border-green-400 text-green-300'}
-            `}>
-              [{e.time}] {e.tag} → {e.message}
+            <div
+              key={e.id}
+              className={
+                e.type === 'CRITICAL'
+                  ? 'text-red-500'
+                  : e.type === 'WARNING'
+                  ? 'text-yellow-400'
+                  : 'text-green-400'
+              }
+            >
+              [{e.time}] {e.message}
             </div>
           ))}
         </div>
@@ -255,13 +262,13 @@ export default function DashboardPage() {
       {/* CONTROL */}
       <div className="grid grid-cols-4 gap-2 mt-6">
 
-        {(['fan','pump','led','heater'] as (keyof typeof controls)[]).map(k => (
+        {Object.keys(controls).map(k => (
           <button
             key={k}
             onClick={() => toggleControl(k)}
-            className={`p-3 border text-xs transition
-              ${controls[k] ? 'border-green-400 bg-green-900/20' : 'border-red-500 bg-red-900/10'}
-            `}
+            className={`p-3 border text-xs ${
+              controls[k] ? 'border-green-400' : 'border-red-500'
+            }`}
           >
             {k.toUpperCase()}
           </button>
@@ -273,13 +280,22 @@ export default function DashboardPage() {
   );
 }
 
-/* ================= CARD ================= */
+/* ================= SAFE CARD ================= */
 
-function Card({ label, value, color }: any) {
+function Card({ label, value, color }: CardProps) {
   return (
     <div className="bg-[#0b1220] border border-gray-700 p-2">
       <div className="text-[10px] opacity-60">{label}</div>
       <div className={`text-sm font-bold ${color || ''}`}>{value}</div>
     </div>
   );
+}
+
+/* ================= SAFE UUID ================= */
+
+function cryptoId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2);
 }
