@@ -1,7 +1,4 @@
-'use client';
-
-import { useEffect, useRef, useState } from 'react';
-import mqtt, { MqttClient } from 'mqtt';
+import Link from 'next/link';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -119,6 +116,9 @@ export default function Page() {
     <div className="scada">
       <div className="header">
         <h1>Glovera Smart farm 대시보드</h1>
+        <div className="nav-links">
+          <Link href="/journal/list" className="nav-link">📖 영농일지</Link>
+        </div>
         <div className={`status ${status}`}>MQTT: {status}</div>
         <Clock />
       </div>
@@ -192,7 +192,10 @@ export default function Page() {
 
       <style jsx>{`
         .scada { background: #05070f; color: white; min-height: 100vh; padding: 24px; font-size: 18px; }
-        .header { display: flex; justify-content: space-between; border-bottom: 1px solid #1f2937; margin-bottom: 16px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f2937; margin-bottom: 16px; }
+        .nav-links { display: flex; gap: 16px; }
+        .nav-link { color: #2563eb; text-decoration: none; font-weight: bold; }
+        .nav-link:hover { color: #1d4ed8; }
         .weather-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; }
         .weather-panel h3 { margin-top: 0; color: #94a3b8; }
         .gauges { display: flex; justify-content: space-around; }
