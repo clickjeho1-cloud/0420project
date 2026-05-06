@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import mqtt from 'mqtt';
+import { useEffect, useState } from 'react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -21,28 +20,16 @@ type SensorData = {
   ph: number;
   waterTemp: number;
   lux: number;
-  rpm: number;
-};
-
-type EventLog = {
-  id: string;
-  time: string;
-  type: 'NORMAL' | 'WARNING' | 'CRITICAL';
-  tag: string;
-  value: number;
-  message: string;
 };
 
 /* ================= PAGE ================= */
 
-export default function Page() {
-  const mqttRef = useRef<mqtt.MqttClient | null>(null);
+export default function DashboardPage() {
 
-  const [time, setTime] = useState<string>('');
-  const [history, setHistory] = useState<SensorData[]>([]);
-  const [events, setEvents] = useState<EventLog[]>([]);
+  const [time, setTime] = useState('');
+  const [history, setHistory] = useState<any[]>([]);
 
-  const [controls, setControls] = useState<Record<string, boolean>>({
+  const [controls, setControls] = useState({
     fan: false,
     pump: false,
     led: false,
@@ -50,13 +37,12 @@ export default function Page() {
   });
 
   const [sensors, setSensors] = useState<SensorData>({
-    temperature: 0,
-    humidity: 0,
-    ec: 0,
-    ph: 0,
-    waterTemp: 0,
-    lux: 0,
-    rpm: 0,
+    temperature: 24,
+    humidity: 58,
+    ec: 2.2,
+    ph: 6.1,
+    waterTemp: 21,
+    lux: 32000,
   });
 
   /* ================= CLOCK ================= */
@@ -68,222 +54,280 @@ export default function Page() {
     return () => clearInterval(t);
   }, []);
 
-  /* ================= MQTT ================= */
+  /* ================= SIM DATA ================= */
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const client = mqtt.connect(
-      'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
-      {
-        username: process.env.NEXT_PUBLIC_MQTT_USER || '',
-        password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
-        reconnectPeriod: 2000,
-      }
-    );
-
-    mqttRef.current = client;
-
-    client.on('connect', () => {
-      client.subscribe('smartfarm/jeho123/data');
-    });
-
-    client.on('message', (_topic: string, payload: Buffer) => {
-      const msg = JSON.parse(payload.toString());
-
+    const t = setInterval(() => {
       const data: SensorData = {
-        temperature: Number(msg.temperature ?? 0),
-        humidity: Number(msg.humidity ?? 0),
-        ec: Number(msg.ec ?? 0),
-        ph: Number(msg.ph ?? 0),
-        waterTemp: Number(msg.waterTemp ?? 0),
-        lux: Number(msg.lux ?? 0),
-        rpm: Number(msg.rpm ?? 0),
+        temperature: 20 + Math.random() * 7,
+        humidity: 45 + Math.random() * 25,
+        ec: 1.2 + Math.random() * 2,
+        ph: 5.5 + Math.random(),
+        waterTemp: 18 + Math.random() * 5,
+        lux: 20000 + Math.random() * 25000,
       };
 
       setSensors(data);
-      setHistory(prev => [...prev.slice(-120), data]);
 
-      /* ================= SIMPLE SCADA ALERT ================= */
-      const isCritical =
-        data.ec > 3 || data.ph < 5.5 || data.ph > 7.5;
+      setHistory(prev => [
+        ...prev.slice(-80),
+        {
+          time: new Date().toLocaleTimeString().slice(0, 8),
+          ...data,
+        },
+      ]);
 
-      const isWarning =
-        data.ec > 1.5;
+    }, 2000);
 
-      const level: EventLog['type'] =
-        isCritical ? 'CRITICAL' : isWarning ? 'WARNING' : 'NORMAL';
-
-      if (level !== 'NORMAL') {
-        setEvents(prev => [
-          {
-            id: cryptoId(),
-            time: new Date().toLocaleTimeString(),
-            type: level,
-            tag: 'SYSTEM',
-            value: data.ec,
-            message: 'Anomaly detected',
-          },
-          ...prev,
-        ].slice(0, 80));
-      }
-    });
-
-    return () => client.end();
+    return () => clearInterval(t);
   }, []);
 
-  /* ================= CONTROL ================= */
-  const toggle = (key: keyof typeof controls) => {
-    setControls(prev => {
-      const next = !prev[key];
-
-      mqttRef.current?.publish(
-        'smartfarm/jeho123/control',
-        JSON.stringify({ device: key, state: next })
-      );
-
-      return { ...prev, [key]: next };
-    });
+  const toggleControl = (key: keyof typeof controls) => {
+    setControls(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
   };
 
-  /* ================= COLORS ================= */
-  const statusColor =
+  /* ================= STATUS COLORS (SCADA STANDARD) ================= */
+
+  const ecStatus =
     sensors.ec < 1.5
-      ? 'text-green-400'
+      ? 'ok'
       : sensors.ec < 3
-      ? 'text-yellow-400'
-      : 'text-red-500';
+      ? 'warn'
+      : 'danger';
 
-  /* ================= UI ================= */
+  const phStatus =
+    sensors.ph >= 5.8 && sensors.ph <= 7.2
+      ? 'ok'
+      : sensors.ph >= 5.5 && sensors.ph <= 7.5
+      ? 'warn'
+      : 'danger';
+
   return (
-    <div className="min-h-screen bg-[#05070f] text-white p-4 font-mono">
+    <div className="dashboard">
 
-      {/* HEADER */}
-      <div className="border-b border-gray-700 pb-2">
-        <h1 className="text-lg tracking-widest text-cyan-300">
-          SMART FARM SCADA SYSTEM
-        </h1>
-        <div className="text-[11px] opacity-60">{time}</div>
+      {/* HEADER BAR */}
+      <div className="topbar">
+        <div className="title">SCADA CONTROL SYSTEM</div>
+        <div className="clock">{time}</div>
       </div>
 
-      {/* STATUS GRID */}
-      <div className="grid grid-cols-6 gap-2 mt-4 text-xs">
+      {/* MAIN GRID (균형 구조 핵심) */}
+      <div className="grid-layout">
 
-        <Box label="TEMP" value={sensors.temperature} />
-        <Box label="HUM" value={sensors.humidity} />
-        <Box label="EC" value={sensors.ec} color={statusColor} />
-        <Box label="PH" value={sensors.ph} />
-        <Box label="WATER" value={sensors.waterTemp} />
-        <Box label="LUX" value={sensors.lux} />
+        {/* LEFT PANEL - STATUS */}
+        <div className="panel">
 
-      </div>
+          <h2>PROCESS STATUS</h2>
 
-      {/* RPM GAUGE */}
-      <div className="mt-6 bg-[#0b1220] border border-gray-700 p-4">
-        <div className="text-xs text-gray-400 mb-2">PUMP SPEED (RPM)</div>
+          <div className="status-grid">
 
-        <div className="relative w-48 h-48 mx-auto">
-          <div className="absolute inset-0 rounded-full border-4 border-gray-700" />
+            <StatusBox label="TEMP" value={sensors.temperature.toFixed(1)} unit="°C" />
+            <StatusBox label="HUM" value={sensors.humidity.toFixed(1)} unit="%" />
 
-          <div
-            className="absolute left-1/2 top-1/2 w-1 h-20 bg-red-500 origin-bottom transition-transform duration-300"
-            style={{
-              transform: `translate(-50%, -100%) rotate(${(sensors.rpm / 4000) * 180 - 90}deg)`,
-            }}
-          />
+            <StatusBox label="EC" value={sensors.ec.toFixed(2)} status={ecStatus} />
+            <StatusBox label="PH" value={sensors.ph.toFixed(2)} status={phStatus} />
 
-          <div className="absolute inset-0 flex items-center justify-center text-sm">
-            {sensors.rpm} RPM
+            <StatusBox label="WATER" value={sensors.waterTemp.toFixed(1)} unit="°C" />
+            <StatusBox label="LUX" value={Math.floor(sensors.lux)} />
+
           </div>
+
         </div>
-      </div>
 
-      {/* CHART */}
-      <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
+        {/* CENTER PANEL - WAVEFORM */}
+        <div className="panel wide">
 
-        <ResponsiveContainer width="100%" height={240}>
-          <AreaChart data={history}>
-            <CartesianGrid stroke="#1f2937" />
-            <XAxis dataKey="time" />
-            <YAxis />
-            <Tooltip />
+          <h2>REALTIME WAVEFORM</h2>
 
-            <Area type="monotone" dataKey="temperature" stroke="#ff4d4d" />
-            <Area type="monotone" dataKey="humidity" stroke="#4dff88" />
-            <Area type="monotone" dataKey="ec" stroke="#4da6ff" />
-            <Area type="monotone" dataKey="ph" stroke="#ffd24d" />
-          </AreaChart>
-        </ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={history}>
+              <CartesianGrid stroke="#1f2937" />
+              <XAxis dataKey="time" />
+              <YAxis />
+              <Tooltip />
 
-      </div>
+              <Area dataKey="temperature" stroke="#ff4d4d" fillOpacity={0.1} />
+              <Area dataKey="humidity" stroke="#4dff88" fillOpacity={0.1} />
+              <Area dataKey="ec" stroke="#4da6ff" fillOpacity={0.1} />
+              <Area dataKey="ph" stroke="#ffd24d" fillOpacity={0.1} />
+            </AreaChart>
+          </ResponsiveContainer>
 
-      {/* EVENT LOG */}
-      <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
-        <div className="text-xs text-gray-400 mb-2">ALARM HISTORY</div>
-
-        <div className="text-xs space-y-1 max-h-40 overflow-auto">
-          {events.map(e => (
-            <div
-              key={e.id}
-              className={
-                e.type === 'CRITICAL'
-                  ? 'text-red-500'
-                  : e.type === 'WARNING'
-                  ? 'text-yellow-400'
-                  : 'text-green-400'
-              }
-            >
-              [{e.time}] {e.message}
-            </div>
-          ))}
         </div>
+
+        {/* RIGHT PANEL - CONTROL */}
+        <div className="panel">
+
+          <h2>CONTROL SYSTEM</h2>
+
+          <div className="control-grid">
+
+            {(Object.keys(controls) as (keyof typeof controls)[]).map(k => {
+
+              const active = controls[k];
+
+              return (
+                <button
+                  key={k}
+                  onClick={() => toggleControl(k)}
+                  className={`control-btn ${
+                    active ? 'on' : 'off'
+                  }`}
+                >
+                  <div>{k.toUpperCase()}</div>
+                  <div className="state">
+                    {active ? 'ACTIVE' : 'OFF'}
+                  </div>
+                </button>
+              );
+            })}
+
+          </div>
+
+        </div>
+
       </div>
 
-      {/* CONTROL PANEL */}
-      <div className="grid grid-cols-4 gap-2 mt-6">
-
-        {(Object.keys(controls) as (keyof typeof controls)[]).map(k => (
-          <button
-            key={k}
-            onClick={() => toggle(k)}
-            className={`p-3 border text-xs tracking-wider ${
-              controls[k]
-                ? 'border-green-400 text-green-300'
-                : 'border-red-500 text-red-400'
-            }`}
-          >
-            {k.toUpperCase()}
-          </button>
-        ))}
-
+      {/* FOOTER */}
+      <div className="footer">
+        Glovera SCADA System © 2026
       </div>
+
+      {/* ================= STYLE ================= */}
+      <style jsx>{`
+
+        .dashboard {
+          min-height: 100vh;
+          background: #05070f;
+          color: white;
+          padding: 16px;
+          font-family: monospace;
+        }
+
+        .topbar {
+          display: flex;
+          justify-content: space-between;
+          padding: 10px 0;
+          border-bottom: 1px solid #1f2937;
+        }
+
+        .title {
+          color: #38bdf8;
+          font-weight: bold;
+        }
+
+        .clock {
+          color: #94a3b8;
+          font-size: 12px;
+        }
+
+        /* 핵심: 3분할 SCADA 구조 */
+        .grid-layout {
+          display: grid;
+          grid-template-columns: 1fr 2fr 1fr;
+          gap: 12px;
+          margin-top: 16px;
+        }
+
+        .panel {
+          background: #0b1220;
+          border: 1px solid #1f2937;
+          padding: 12px;
+          border-radius: 10px;
+        }
+
+        .panel.wide {
+          display: flex;
+          flex-direction: column;
+        }
+
+        h2 {
+          font-size: 12px;
+          color: #94a3b8;
+          margin-bottom: 10px;
+        }
+
+        .status-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .box {
+          background: #0f172a;
+          padding: 8px;
+          border-radius: 6px;
+          text-align: center;
+        }
+
+        .ok { color: #22c55e; }
+        .warn { color: #facc15; }
+        .danger { color: #ef4444; }
+
+        .control-grid {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .control-btn {
+          padding: 10px;
+          border: 1px solid #334155;
+          background: #0f172a;
+          color: white;
+          cursor: pointer;
+          text-align: left;
+        }
+
+        .control-btn.on {
+          border-color: #22c55e;
+          color: #22c55e;
+        }
+
+        .control-btn.off {
+          border-color: #ef4444;
+          color: #ef4444;
+        }
+
+        .state {
+          font-size: 10px;
+          opacity: 0.7;
+        }
+
+        .footer {
+          margin-top: 16px;
+          text-align: center;
+          font-size: 11px;
+          color: #64748b;
+        }
+
+      `}</style>
 
     </div>
   );
 }
 
-/* ================= BOX ================= */
+/* ================= STATUS BOX ================= */
 
-function Box({
+function StatusBox({
   label,
   value,
-  color,
+  unit,
+  status,
 }: {
   label: string;
-  value: number | string;
-  color?: string;
+  value: string | number;
+  unit?: string;
+  status?: 'ok' | 'warn' | 'danger';
 }) {
   return (
-    <div className="bg-[#0b1220] border border-gray-700 p-2 text-center">
-      <div className="text-[10px] text-gray-400">{label}</div>
-      <div className={`text-sm font-bold ${color || ''}`}>{value}</div>
+    <div className={`box ${status || ''}`}>
+      <div style={{ fontSize: 10, opacity: 0.6 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 'bold' }}>
+        {value}{unit}
+      </div>
     </div>
   );
-}
-
-/* ================= SAFE ID ================= */
-
-function cryptoId() {
-  return typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
 }
