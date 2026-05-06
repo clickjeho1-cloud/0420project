@@ -60,9 +60,11 @@ export default function DashboardPage() {
 
   const [history, setHistory] = useState<HistoryData[]>([]);
 
-  // ===== 시간 =====
+  // ===== 시간 (원본 유지) =====
   useEffect(() => {
+
     const updateClock = () => {
+
       const now = new Date();
       const days = ['일','월','화','수','목','금','토'];
 
@@ -79,14 +81,22 @@ export default function DashboardPage() {
 
     updateClock();
     const timer = setInterval(updateClock, 1000);
+
     return () => clearInterval(timer);
+
   }, []);
 
-  // ===== 날씨 =====
+  // ===== 기상청 (원본 유지) =====
   useEffect(() => {
+
     async function loadWeather() {
+
       try {
-        const res = await fetch('/api/weather', { cache: 'no-store' });
+
+        const res = await fetch('/api/weather', {
+          cache: 'no-store',
+        });
+
         const data = await res.json();
 
         setWeather({
@@ -96,20 +106,25 @@ export default function DashboardPage() {
         });
 
       } catch {
+
         setWeather({
           temp: '--',
           wind: '--',
           source: '기상청 연결 실패',
         });
+
       }
     }
 
     loadWeather();
+
     const interval = setInterval(loadWeather, 60000);
+
     return () => clearInterval(interval);
+
   }, []);
 
-  // ===== MQTT (핵심 수정 완료 버전) =====
+  // ===== MQTT (기능만 안전하게 추가) =====
   useEffect(() => {
 
     const client = mqtt.connect(
@@ -127,7 +142,9 @@ export default function DashboardPage() {
     });
 
     client.on('message', (topic, message) => {
+
       try {
+
         const data = JSON.parse(message.toString());
 
         setSensors(prev => ({
@@ -148,60 +165,89 @@ export default function DashboardPage() {
           },
         ]);
 
-      } catch (e) {
+      } catch {
         console.log('MQTT parse error');
       }
+
     });
 
-    client.on('error', (err) => {
+    client.on('error', err => {
       console.log('MQTT error:', err.message);
     });
 
-    // ✔️ Vercel 통과 핵심: 반드시 end()만 반환
     return () => {
       client.end(true);
     };
 
   }, []);
 
-  // ===== 제어 =====
   const toggleControl = (key: keyof typeof controls) => {
+
     setControls(prev => ({
       ...prev,
       [key]: !prev[key],
     }));
 
-    console.log('MQTT SEND', key);
   };
 
   return (
+
     <div className="dashboard">
 
-      <h1 className="title">Glovera 농장 스마트팜 대시보드</h1>
+      {/* ===== 타이틀 (원본 유지) ===== */}
+      <h1 className="title">
+        Glovera 농장 스마트팜 대시보드
+      </h1>
+
       <div className="clock">{time}</div>
 
-      {/* 상태 */}
+      {/* ===== 실시간 상황 (원본 UI 유지) ===== */}
       <section className="panel glass-blue">
+
         <h2>실시간 상황 계기판</h2>
 
         <div className="grid">
+
           <GlassCard title="외부온도" value={weather.temp} />
           <GlassCard title="풍속" value={weather.wind} />
+
           <GlassCard title="온도" value={`${sensors.temperature}°C`} />
           <GlassCard title="습도" value={`${sensors.humidity}%`} />
           <GlassCard title="EC" value={`${sensors.ec}`} />
           <GlassCard title="광량" value={`${sensors.lux}`} />
+
         </div>
 
-        <div className="source">{weather.source}</div>
+        <div className="source">
+          {weather.source}
+        </div>
+
       </section>
 
-      {/* 파형 */}
+      {/* ===== 원형 계기판 (원본 유지) ===== */}
+      <section className="panel glass-dark">
+
+        <h2>실시간 원형 분석 계기판</h2>
+
+        <div className="gauge-grid">
+
+          <Gauge title="TEMP" value={sensors.temperature} unit="°C" />
+          <Gauge title="HUMIDITY" value={sensors.humidity} unit="%" />
+          <Gauge title="EC" value={sensors.ec} unit="ds/m" />
+
+        </div>
+
+      </section>
+
+      {/* ===== 파형 (원본 유지 + MQTT 데이터) ===== */}
       <section className="panel glass-wave">
-        <h2>실시간 파형</h2>
+
+        <h2>실시간 업다운 파형 분석</h2>
 
         <ResponsiveContainer width="100%" height={400}>
+
           <AreaChart data={history}>
+
             <CartesianGrid stroke="#334155" />
             <XAxis dataKey="time" />
             <YAxis />
@@ -209,46 +255,138 @@ export default function DashboardPage() {
 
             <Area dataKey="temperature" stroke="#ff0000" fill="#ff0000" fillOpacity={0.2} />
             <Area dataKey="humidity" stroke="#00ff00" fill="#00ff00" fillOpacity={0.2} />
+            <Area dataKey="ec" stroke="#00ccff" fill="#00ccff" fillOpacity={0.2} />
+            <Area dataKey="ph" stroke="#ffff00" fill="#ffff00" fillOpacity={0.2} />
+
           </AreaChart>
+
         </ResponsiveContainer>
+
       </section>
 
-      {/* 제어 */}
+      {/* ===== history (원본 유지) ===== */}
+      <section className="panel glass-history">
+
+        <div className="history-top">
+
+          <h2>센서 History</h2>
+
+          <div className="history-buttons">
+
+            {['1H','12H','24H','7D'].map(item => (
+
+              <button
+                key={item}
+                onClick={() => setHistoryMode(item)}
+              >
+                {item}
+              </button>
+
+            ))}
+
+          </div>
+
+        </div>
+
+        <div className="history-grid">
+
+          <HistoryCard title="온도" value={`${sensors.temperature}°C`} />
+          <HistoryCard title="습도" value={`${sensors.humidity}%`} />
+          <HistoryCard title="EC" value={`${sensors.ec}`} />
+          <HistoryCard title="PH" value={`${sensors.ph}`} />
+
+        </div>
+
+        <div className="log-box">
+          현재 선택: {historyMode} 로그 출력 영역
+        </div>
+
+      </section>
+
+      {/* ===== 제어 시스템 (원본 유지) ===== */}
       <section className="panel glass-control">
+
         <h2>제어 시스템</h2>
 
         <div className="control-grid">
-          {Object.keys(controls).map((key) => (
+
+          {(Object.keys(controls) as Array<keyof typeof controls>).map(key => (
+
             <div key={key} className="control-card">
+
               <h3>{key.toUpperCase()}</h3>
+
               <div className="status">
-                상태: {controls[key as keyof typeof controls] ? 'ON' : 'OFF'}
+                상태: {controls[key] ? ' ON' : ' OFF'}
               </div>
 
               <button
-                className={controls[key as keyof typeof controls] ? 'btn-on' : 'btn-off'}
-                onClick={() => toggleControl(key as keyof typeof controls)}
+                className={controls[key] ? 'btn-on' : 'btn-off'}
+                onClick={() => toggleControl(key)}
               >
-                TOGGLE
+                {controls[key] ? 'TURN OFF' : 'TURN ON'}
               </button>
+
             </div>
+
           ))}
+
         </div>
+
       </section>
 
       <footer className="footer">
         copyright@glovera orginated by jhk in 2026
       </footer>
+
     </div>
+
   );
 }
 
-// ===== UI 컴포넌트 =====
+/* ===== UI 컴포넌트 (원본 유지) ===== */
+
 function GlassCard({ title, value }: { title: string; value: string }) {
+
   return (
     <div className="glass-card">
       <h3>{title}</h3>
       <div className="glass-value">{value}</div>
     </div>
   );
+
+}
+
+function Gauge({ title, value, unit }: { title: string; value: number; unit: string }) {
+
+  return (
+    <div className="gauge">
+
+      <h3>{title}</h3>
+
+      <div className="ring">
+
+        <div className="inner">
+
+          <div className="gauge-value">{value}</div>
+          <div>{unit}</div>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+
+}
+
+function HistoryCard({ title, value }: { title: string; value: string }) {
+
+  return (
+    <div className="history-card">
+      <h3>{title}</h3>
+      <p>{value}</p>
+    </div>
+  );
+
 }
