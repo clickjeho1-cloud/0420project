@@ -1,4 +1,8 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import mqtt, { MqttClient } from 'mqtt';
 import {
   ResponsiveContainer,
   AreaChart,

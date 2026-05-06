@@ -8,7 +8,7 @@ export async function GET() {
 
   try {
     const { data, error } = await supabase
-      .from('journal')
+      .from('journals')
       .select('*')
       .order('date', { ascending: false });
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const { date, height, leafSize, waterAmount, notes } = body;
 
     const { data, error } = await supabase
-      .from('journal')
+      .from('journals')
       .insert([{ date, height, leafSize, waterAmount, notes }])
       .select();
 
@@ -44,5 +44,4 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
   }
-}</content>
-<parameter name="filePath">c:/0420project/app/api/journal/route.ts
+}

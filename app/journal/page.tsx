@@ -147,5 +147,4 @@ export default function JournalWritePage() {
       `}</style>
     </div>
   );
-}</content>
-<parameter name="filePath">c:/0420project/app/journal/page.tsx
+}
