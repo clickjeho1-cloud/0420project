@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from 'recharts';
 
-/* ================= SENSOR ================= */
+/* ================= TYPE ================= */
 
 type Sensor = {
   temp: number;
@@ -37,9 +37,13 @@ const EMPTY: Sensor = {
 export default function Page() {
 
   const clientRef = useRef<any>(null);
+  const reconnectRef = useRef<any>(null);
 
   const [sensor, setSensor] = useState<Sensor>(EMPTY);
   const [history, setHistory] = useState<any[]>([]);
+  const [status, setStatus] =
+    useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
+
   const [time, setTime] = useState('');
 
   const [control, setControl] = useState({
@@ -56,48 +60,55 @@ export default function Page() {
     return () => clearInterval(t);
   }, []);
 
-  /* ================= NORMALIZER (핵심) ================= */
-  const normalize = (msg: any): Sensor => {
-    return {
-      temp: msg?.values?.temp ?? msg?.temp ?? 0,
-      hum: msg?.values?.hum ?? msg?.hum ?? 0,
-      lux: msg?.values?.lux ?? 0,
-      ec: msg?.values?.ec ?? 0,
-      ph: msg?.values?.ph ?? 0,
-      ppfd: msg?.values?.ppfd ?? 0,
-    };
-  };
+  /* ================= NORMALIZE ================= */
+  const normalize = (msg: any): Sensor => ({
+    temp: msg?.values?.temp ?? msg?.temp ?? 0,
+    hum: msg?.values?.hum ?? msg?.hum ?? 0,
+    lux: msg?.values?.lux ?? 0,
+    ec: msg?.values?.ec ?? 0,
+    ph: msg?.values?.ph ?? 0,
+    ppfd: msg?.values?.ppfd ?? 0,
+  });
 
   /* ================= MQTT ================= */
-  useEffect(() => {
+  const connectMQTT = () => {
 
-    let alive = true;
+    try {
 
-    (async () => {
+      setStatus('CONNECTING');
 
-      const mqttClient = mqtt.connect(
+      const client = mqtt.connect(
         'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
         {
           username: process.env.NEXT_PUBLIC_MQTT_USER || '',
           password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
           reconnectPeriod: 2000,
+          connectTimeout: 5000,
         }
       );
 
-      clientRef.current = mqttClient;
+      clientRef.current = client;
 
-      mqttClient.on('connect', () => {
-        mqttClient.subscribe('smartfarm/jeho123/data');
+      client.on('connect', () => {
+        setStatus('CONNECTED');
+        client.subscribe('smartfarm/jeho123/data');
       });
 
-      mqttClient.on('message', (_: any, payload: any) => {
+      client.on('error', () => {
+        setStatus('DISCONNECTED');
+        scheduleReconnect();
+      });
 
-        if (!alive) return;
+      client.on('close', () => {
+        setStatus('DISCONNECTED');
+        scheduleReconnect();
+      });
+
+      client.on('message', (_: any, payload: any) => {
 
         try {
 
           const msg = JSON.parse(payload.toString());
-
           const data = normalize(msg);
 
           setSensor(data);
@@ -110,17 +121,38 @@ export default function Page() {
             },
           ]);
 
-        } catch (e) {
-          console.log('MQTT PARSE ERROR');
+        } catch {
+          // SCADA safe fail
         }
 
       });
 
-    })();
+    } catch {
+      setStatus('DISCONNECTED');
+      scheduleReconnect();
+    }
+
+  };
+
+  /* ================= AUTO RECONNECT ================= */
+  const scheduleReconnect = () => {
+
+    if (reconnectRef.current) return;
+
+    reconnectRef.current = setTimeout(() => {
+      reconnectRef.current = null;
+      connectMQTT();
+    }, 3000);
+
+  };
+
+  useEffect(() => {
+
+    connectMQTT();
 
     return () => {
-      alive = false;
       clientRef.current?.end?.();
+      clearTimeout(reconnectRef.current);
     };
 
   }, []);
@@ -142,19 +174,26 @@ export default function Page() {
 
   };
 
-  /* ================= SAFE DATA ================= */
   const v = sensor ?? EMPTY;
 
+  /* ================= UI ================= */
   return (
     <div className="scada">
 
       {/* HEADER */}
       <div className="header">
-        <h1>GLOVERA SMART FARM SCADA</h1>
+
+        <h1>Glovera Smart farm 대시보드</h1>
+
+        <div className={`status ${status}`}>
+          MQTT: {status}
+        </div>
+
         <div>{time}</div>
+
       </div>
 
-      {/* STATUS GRID */}
+      {/* SENSOR GRID */}
       <div className="grid">
 
         <Box label="TEMP" value={v.temp} />
@@ -166,12 +205,17 @@ export default function Page() {
 
       </div>
 
-      {/* GRAPH */}
+      {/* CHART */}
       <div className="chart">
 
         <ResponsiveContainer width="100%" height={320}>
+
           <AreaChart
-            data={history.length ? history : [{ time: '--', temp: 0, hum: 0, lux: 0, ec: 0, ph: 0, ppfd: 0 }]}
+            data={
+              history.length
+                ? history
+                : [{ time: '--', temp: 0, hum: 0, lux: 0, ec: 0, ph: 0, ppfd: 0 }]
+            }
           >
 
             <CartesianGrid stroke="#1f2937" />
@@ -186,6 +230,7 @@ export default function Page() {
             <Area dataKey="ph" stroke="#a855f7" fill="#a855f7" />
 
           </AreaChart>
+
         </ResponsiveContainer>
 
       </div>
@@ -209,7 +254,7 @@ export default function Page() {
 
       {/* FOOTER */}
       <div className="footer">
-        copyright@orginated jhk in 2026
+        copyright @ originated jhk in 2026
       </div>
 
       {/* STYLE */}
@@ -262,6 +307,10 @@ export default function Page() {
           text-align: center;
           color: #64748b;
         }
+
+        .status.CONNECTED { color: #22c55e; }
+        .status.CONNECTING { color: #facc15; }
+        .status.DISCONNECTED { color: #ef4444; }
 
         .box {
           background: #0b1220;
