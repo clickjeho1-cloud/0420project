@@ -12,6 +12,8 @@ import {
   Tooltip,
 } from 'recharts';
 
+/* ================= TYPES ================= */
+
 type SensorData = {
   temperature: number;
   humidity: number;
@@ -22,22 +24,23 @@ type SensorData = {
   rpm: number;
 };
 
-type HistoryData = {
+type EventLog = {
+  id: string;
   time: string;
-  temperature: number;
-  humidity: number;
-  ec: number;
-  ph: number;
-  waterTemp: number;
-  lux: number;
-  rpm: number;
+  type: 'NORMAL' | 'WARNING' | 'CRITICAL';
+  tag: string;
+  value: number;
+  message: string;
 };
+
+/* ================= PAGE ================= */
 
 export default function DashboardPage() {
   const mqttRef = useRef<mqtt.MqttClient | null>(null);
 
   const [time, setTime] = useState('');
-  const [history, setHistory] = useState<HistoryData[]>([]);
+  const [events, setEvents] = useState<EventLog[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
 
   const [controls, setControls] = useState({
     fan: false,
@@ -64,18 +67,18 @@ export default function DashboardPage() {
     return () => clearInterval(t);
   }, []);
 
-  /* ================= MQTT (Vercel SAFE) ================= */
+  /* ================= MQTT ================= */
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const url = 'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt';
-
-    const client = mqtt.connect(url, {
-      username: process.env.NEXT_PUBLIC_MQTT_USER || '',
-      password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
-      reconnectPeriod: 2000,
-      clean: true,
-    });
+    const client = mqtt.connect(
+      'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
+      {
+        username: process.env.NEXT_PUBLIC_MQTT_USER || '',
+        password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
+        reconnectPeriod: 2000,
+      }
+    );
 
     mqttRef.current = client;
 
@@ -83,31 +86,62 @@ export default function DashboardPage() {
       client.subscribe('smartfarm/jeho123/data');
     });
 
-    client.on('message', (_topic, payload) => {
-      try {
-        const msg = JSON.parse(payload.toString());
+    client.on('message', (_t, payload) => {
+      const msg = JSON.parse(payload.toString());
 
-        const data: SensorData = {
-          temperature: msg.temperature ?? 0,
-          humidity: msg.humidity ?? 0,
-          ec: msg.ec ?? 0,
-          ph: msg.ph ?? 0,
-          waterTemp: msg.waterTemp ?? 0,
-          lux: msg.lux ?? 0,
-          rpm: msg.rpm ?? 0,
-        };
+      const data: SensorData = {
+        temperature: msg.temperature ?? 0,
+        humidity: msg.humidity ?? 0,
+        ec: msg.ec ?? 0,
+        ph: msg.ph ?? 0,
+        waterTemp: msg.waterTemp ?? 0,
+        lux: msg.lux ?? 0,
+        rpm: msg.rpm ?? 0,
+      };
 
-        setSensors(data);
+      setSensors(data);
 
-        setHistory(prev => [
-          ...prev.slice(-120),
-          {
-            time: new Date().toLocaleTimeString(),
-            ...data,
-          },
-        ]);
-      } catch (e) {
-        console.log('MQTT parse error');
+      /* ================= HISTORY ================= */
+      setHistory(prev => [
+        ...prev.slice(-120),
+        {
+          time: new Date().toLocaleTimeString(),
+          ...data,
+        },
+      ]);
+
+      /* ================= SCADA EVENT ENGINE ================= */
+      const newEvents: EventLog[] = [];
+
+      const ecLevel = data.ec < 1.5 ? 'NORMAL' : data.ec < 3 ? 'WARNING' : 'CRITICAL';
+      const phLevel = data.ph >= 6 && data.ph <= 7 ? 'NORMAL'
+                    : data.ph >= 5.5 && data.ph <= 7.5 ? 'WARNING'
+                    : 'CRITICAL';
+
+      if (ecLevel !== 'NORMAL') {
+        newEvents.push({
+          id: crypto.randomUUID(),
+          time: new Date().toLocaleTimeString(),
+          type: ecLevel,
+          tag: 'EC',
+          value: data.ec,
+          message: `EC anomaly detected: ${data.ec}`,
+        });
+      }
+
+      if (phLevel !== 'NORMAL') {
+        newEvents.push({
+          id: crypto.randomUUID(),
+          time: new Date().toLocaleTimeString(),
+          type: phLevel,
+          tag: 'PH',
+          value: data.ph,
+          message: `PH anomaly detected: ${data.ph}`,
+        });
+      }
+
+      if (newEvents.length > 0) {
+        setEvents(prev => [...newEvents, ...prev].slice(0, 100));
       }
     });
 
@@ -134,9 +168,9 @@ export default function DashboardPage() {
     sensors.ec < 3 ? 'text-yellow-400' : 'text-red-500';
 
   const phColor =
-    sensors.ph < 5.5 || sensors.ph > 7.5 ? 'text-red-500'
-    : sensors.ph < 6 || sensors.ph > 7 ? 'text-yellow-400'
-    : 'text-green-400';
+    sensors.ph >= 6 && sensors.ph <= 7 ? 'text-green-400'
+    : sensors.ph >= 5.5 && sensors.ph <= 7.5 ? 'text-yellow-400'
+    : 'text-red-500';
 
   return (
     <div className="min-h-screen bg-[#05070f] text-white p-4">
@@ -144,7 +178,7 @@ export default function DashboardPage() {
       {/* HEADER */}
       <div className="border-b border-gray-700 pb-2">
         <h1 className="text-lg font-bold tracking-widest">
-          SCADA SMART FARM CONTROL SYSTEM
+          SCADA CONTROL CENTER
         </h1>
         <div className="text-xs opacity-60">{time}</div>
       </div>
@@ -152,11 +186,11 @@ export default function DashboardPage() {
       {/* STATUS GRID */}
       <div className="grid grid-cols-6 gap-2 mt-4 text-sm">
 
-        <Card label="TEMP" value={`${sensors.temperature}°C`} />
-        <Card label="HUMID" value={`${sensors.humidity}%`} />
+        <Card label="TEMP" value={sensors.temperature} />
+        <Card label="HUMID" value={sensors.humidity} />
         <Card label="EC" value={sensors.ec} color={ecColor} />
         <Card label="PH" value={sensors.ph} color={phColor} />
-        <Card label="WATER" value={`${sensors.waterTemp}°C`} />
+        <Card label="WATER" value={sensors.waterTemp} />
         <Card label="LUX" value={sensors.lux} />
 
       </div>
@@ -181,9 +215,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* SCADA WAVE */}
+      {/* WAVE */}
       <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
-        <h2 className="text-xs mb-2">SIGNAL FLOW</h2>
+        <h2 className="text-xs mb-2">REALTIME SIGNAL</h2>
 
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={history}>
@@ -200,30 +234,37 @@ export default function DashboardPage() {
         </ResponsiveContainer>
       </div>
 
-      {/* PUMP FLOW SYSTEM */}
+      {/* EVENT LOG */}
+      <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
+        <h2 className="text-xs mb-2">ALARM EVENT LOG</h2>
+
+        <div className="space-y-1 max-h-40 overflow-auto text-xs">
+          {events.map(e => (
+            <div key={e.id} className={`
+              p-1 border-l-2
+              ${e.type === 'CRITICAL' ? 'border-red-500 text-red-400' :
+                e.type === 'WARNING' ? 'border-yellow-400 text-yellow-300' :
+                'border-green-400 text-green-300'}
+            `}>
+              [{e.time}] {e.tag} → {e.message}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CONTROL */}
       <div className="grid grid-cols-4 gap-2 mt-6">
 
         {(['fan','pump','led','heater'] as (keyof typeof controls)[]).map(k => (
-          <div
+          <button
             key={k}
-            className={`relative p-3 border text-center transition
+            onClick={() => toggleControl(k)}
+            className={`p-3 border text-xs transition
               ${controls[k] ? 'border-green-400 bg-green-900/20' : 'border-red-500 bg-red-900/10'}
             `}
           >
-            <div className="text-xs">{k.toUpperCase()}</div>
-
-            <button
-              onClick={() => toggleControl(k)}
-              className="mt-2 text-xs border px-2 py-1"
-            >
-              TOGGLE
-            </button>
-
-            {/* FLOW ANIMATION */}
-            {controls[k] && (
-              <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 animate-pulse" />
-            )}
-          </div>
+            {k.toUpperCase()}
+          </button>
         ))}
 
       </div>
@@ -233,6 +274,7 @@ export default function DashboardPage() {
 }
 
 /* ================= CARD ================= */
+
 function Card({ label, value, color }: any) {
   return (
     <div className="bg-[#0b1220] border border-gray-700 p-2">
