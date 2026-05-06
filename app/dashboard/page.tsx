@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import mqtt from 'mqtt';
-
 import {
   ResponsiveContainer,
   AreaChart,
@@ -20,6 +19,7 @@ type SensorData = {
   ph: number;
   waterTemp: number;
   lux: number;
+  rpm: number;
 };
 
 type HistoryData = {
@@ -29,18 +29,12 @@ type HistoryData = {
   ec: number;
   ph: number;
   waterTemp: number;
+  lux: number;
+  rpm: number;
 };
 
 export default function DashboardPage() {
-
   const [time, setTime] = useState('');
-  const [historyMode, setHistoryMode] = useState('1H');
-
-  const [weather, setWeather] = useState({
-    temp: '--',
-    wind: '--',
-    source: '기상청 제공',
-  });
 
   const [controls, setControls] = useState({
     fan: false,
@@ -56,57 +50,21 @@ export default function DashboardPage() {
     ph: 6.1,
     waterTemp: 21,
     lux: 32000,
+    rpm: 1200,
   });
 
   const [history, setHistory] = useState<HistoryData[]>([]);
-
   const mqttRef = useRef<mqtt.MqttClient | null>(null);
 
-  // ================= TIME =================
+  /* ================= CLOCK ================= */
   useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      const days = ['일','월','화','수','목','금','토'];
-
-      setTime(
-        `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 ` +
-        `${days[now.getDay()]}요일 ` +
-        `${String(now.getHours()).padStart(2,'0')}시 ` +
-        `${String(now.getMinutes()).padStart(2,'0')}분 ` +
-        `${String(now.getSeconds()).padStart(2,'0')}초`
-      );
+    const t = setInterval(() => {
+      setTime(new Date().toLocaleString());
     }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // ================= WEATHER =================
-  useEffect(() => {
-    async function loadWeather() {
-      try {
-        const res = await fetch('/api/weather', { cache: 'no-store' });
-        const data = await res.json();
-
-        setWeather({
-          temp: `${data.temperature}°C`,
-          wind: `${data.windspeed} km/h`,
-          source: '기상청 제공',
-        });
-      } catch {
-        setWeather({
-          temp: '--',
-          wind: '--',
-          source: '기상청 연결 실패',
-        });
-      }
-    }
-
-    loadWeather();
-    const t = setInterval(loadWeather, 60000);
     return () => clearInterval(t);
   }, []);
 
-  // ================= MQTT REALTIME =================
+  /* ================= MQTT ================= */
   useEffect(() => {
     const client = mqtt.connect(
       'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
@@ -120,155 +78,157 @@ export default function DashboardPage() {
     mqttRef.current = client;
 
     client.on('connect', () => {
-      console.log('MQTT CONNECTED');
       client.subscribe('smartfarm/jeho123/data');
     });
 
-    client.on('message', (_topic, payload) => {
-      try {
-        const msg = JSON.parse(payload.toString());
+    client.on('message', (_t, payload) => {
+      const msg = JSON.parse(payload.toString());
 
-        const data: SensorData = {
-          temperature: msg.temperature ?? 0,
-          humidity: msg.humidity ?? 0,
-          ec: msg.ec ?? 0,
-          ph: msg.ph ?? 0,
-          waterTemp: msg.waterTemp ?? 0,
-          lux: msg.lux ?? 0,
-        };
+      const data: SensorData = {
+        temperature: msg.temperature ?? 0,
+        humidity: msg.humidity ?? 0,
+        ec: msg.ec ?? 0,
+        ph: msg.ph ?? 0,
+        waterTemp: msg.waterTemp ?? 0,
+        lux: msg.lux ?? 0,
+        rpm: msg.rpm ?? 0,
+      };
 
-        setSensors(data);
+      setSensors(data);
 
-        setHistory(prev => [
-          ...prev.slice(-80),
-          {
-            time: new Date().toLocaleTimeString().slice(0,8),
-            ...data,
-          },
-        ]);
-
-      } catch (e) {
-        console.log('MQTT PARSE ERROR');
-      }
+      setHistory(prev => [
+        ...prev.slice(-100),
+        {
+          time: new Date().toLocaleTimeString(),
+          ...data,
+        },
+      ]);
     });
 
-    return () => {
-      client.end();
-    };
+    return () => client.end();
   }, []);
 
-  // ================= CONTROL =================
+  /* ================= CONTROL ================= */
   const toggleControl = (key: keyof typeof controls) => {
-    setControls(prev => ({ ...prev, [key]: !prev[key] }));
-
-    mqttRef.current?.publish(
-      'smartfarm/jeho123/control',
-      JSON.stringify({ device: key, state: !controls[key] })
-    );
+    setControls(prev => {
+      const next = !prev[key];
+      mqttRef.current?.publish(
+        'smartfarm/jeho123/control',
+        JSON.stringify({ device: key, state: next })
+      );
+      return { ...prev, [key]: next };
+    });
   };
 
+  /* ================= THRESHOLD COLOR ================= */
+  const ecColor = sensors.ec < 1.5 ? 'text-green-400' :
+                  sensors.ec < 3 ? 'text-yellow-400' : 'text-red-500';
+
+  const phColor = sensors.ph < 5.5 || sensors.ph > 7.5 ? 'text-red-500'
+                : sensors.ph < 6 || sensors.ph > 7 ? 'text-yellow-400'
+                : 'text-green-400';
+
   return (
-    <div className="dashboard">
+    <div className="bg-[#05070f] text-white min-h-screen p-4">
 
-      <h1 className="title">Glovera 농장 스마트팜 대시보드</h1>
-      <div className="clock">{time}</div>
+      {/* ================= HEADER ================= */}
+      <div className="border-b border-gray-700 pb-2">
+        <h1 className="text-xl font-bold tracking-widest">
+          SCADA SMART FARM CONTROL SYSTEM
+        </h1>
+        <div className="text-xs opacity-60">{time}</div>
+      </div>
 
-      {/* ===== WEATHER / STATUS ===== */}
-      <section className="panel glass-blue">
-        <h2>실시간 상황 계기판</h2>
+      {/* ================= STATUS GRID ================= */}
+      <div className="grid grid-cols-6 gap-2 mt-4 text-sm">
 
-        <div className="grid">
-          <GlassCard title="외부온도" value={weather.temp} />
-          <GlassCard title="풍속" value={weather.wind} />
-          <GlassCard title="온도" value={`${sensors.temperature}°C`} />
-          <GlassCard title="습도" value={`${sensors.humidity}%`} />
-          <GlassCard title="EC" value={`${sensors.ec}`} />
-          <GlassCard title="광량" value={`${sensors.lux}`} />
+        <Card label="TEMP" value={`${sensors.temperature}°C`} />
+        <Card label="HUMID" value={`${sensors.humidity}%`} />
+        <Card label="EC" value={sensors.ec} color={ecColor} />
+        <Card label="PH" value={sensors.ph} color={phColor} />
+        <Card label="WATER" value={`${sensors.waterTemp}°C`} />
+        <Card label="LUX" value={sensors.lux} />
+
+      </div>
+
+      {/* ================= RPM GAUGE ================= */}
+      <div className="mt-6 bg-[#0b1220] p-4 border border-gray-700">
+        <h2 className="text-sm mb-2">PUMP RPM GAUGE</h2>
+
+        <div className="relative w-40 h-40 mx-auto">
+          <div className="absolute inset-0 rounded-full border-4 border-gray-700" />
+
+          {/* needle */}
+          <div
+            className="absolute left-1/2 top-1/2 w-1 h-16 bg-red-500 origin-bottom transition-transform duration-500"
+            style={{
+              transform: `translate(-50%, -100%) rotate(${(sensors.rpm / 4000) * 180 - 90}deg)`
+            }}
+          />
+
+          <div className="absolute inset-0 flex items-center justify-center text-sm">
+            {sensors.rpm} RPM
+          </div>
         </div>
+      </div>
 
-        <div className="source">{weather.source}</div>
-      </section>
+      {/* ================= WAVE SCADA ================= */}
+      <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
+        <h2 className="text-sm mb-2">REALTIME PROCESS SIGNAL</h2>
 
-      {/* ===== GAUGE ===== */}
-      <section className="panel glass-dark">
-        <h2>실시간 원형 분석 계기판</h2>
-
-        <div className="gauge-grid">
-          <Gauge title="TEMP" value={sensors.temperature} unit="°C" />
-          <Gauge title="HUMIDITY" value={sensors.humidity} unit="%" />
-          <Gauge title="EC" value={sensors.ec} unit="ds/m" />
-        </div>
-      </section>
-
-      {/* ===== CHART ===== */}
-      <section className="panel glass-wave">
-        <h2>실시간 업다운 파형 분석</h2>
-
-        <ResponsiveContainer width="100%" height={400}>
+        <ResponsiveContainer width="100%" height={250}>
           <AreaChart data={history}>
-            <CartesianGrid stroke="#334155" />
+            <CartesianGrid stroke="#1f2937" />
             <XAxis dataKey="time" />
             <YAxis />
             <Tooltip />
 
-            <Area dataKey="temperature" stroke="#ff0000" fill="#ff0000" />
-            <Area dataKey="humidity" stroke="#00ff00" fill="#00ff00" />
-            <Area dataKey="ec" stroke="#00ccff" fill="#00ccff" />
-            <Area dataKey="ph" stroke="#ffff00" fill="#ffff00" />
+            <Area dataKey="temperature" stroke="#ff4d4d" />
+            <Area dataKey="humidity" stroke="#4dff88" />
+            <Area dataKey="ec" stroke="#4da6ff" />
+            <Area dataKey="ph" stroke="#ffd24d" />
           </AreaChart>
         </ResponsiveContainer>
-      </section>
-
-      {/* ===== CONTROL ===== */}
-      <section className="panel glass-control">
-        <h2>제어 시스템</h2>
-
-        <div className="control-grid">
-          {(Object.keys(controls) as (keyof typeof controls)[]).map(key => (
-            <div key={key} className="control-card">
-              <h3>{key.toUpperCase()}</h3>
-              <div>상태: {controls[key] ? 'ON' : 'OFF'}</div>
-
-              <button
-                className={controls[key] ? 'btn-on' : 'btn-off'}
-                onClick={() => toggleControl(key)}
-              >
-                TOGGLE
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <footer className="footer">
-        copyright@glovera orginated by jhk in 2026
-      </footer>
-
-    </div>
-  );
-}
-
-/* ===== UI COMPONENTS ===== */
-
-function GlassCard({ title, value }: any) {
-  return (
-    <div className="glass-card">
-      <h3>{title}</h3>
-      <div className="glass-value">{value}</div>
-    </div>
-  );
-}
-
-function Gauge({ title, value, unit }: any) {
-  return (
-    <div className="gauge">
-      <h3>{title}</h3>
-      <div className="ring">
-        <div className="inner">
-          <div className="gauge-value">{value}</div>
-          <div>{unit}</div>
-        </div>
       </div>
+
+      {/* ================= PUMP FLOW ================= */}
+      <div className="mt-6 grid grid-cols-4 gap-2">
+
+        {(['fan','pump','led','heater'] as (keyof typeof controls)[]).map(k => (
+          <div
+            key={k}
+            className={`relative p-3 border text-center transition
+              ${controls[k] ? 'border-green-400 bg-green-900/20' : 'border-red-500 bg-red-900/10'}
+            `}
+          >
+            <div className="text-xs">{k.toUpperCase()}</div>
+
+            <button
+              onClick={() => toggleControl(k)}
+              className="mt-2 text-xs px-2 py-1 border"
+            >
+              TOGGLE
+            </button>
+
+            {/* water flow animation */}
+            {controls[k] && (
+              <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 animate-pulse" />
+            )}
+          </div>
+        ))}
+
+      </div>
+
+    </div>
+  );
+}
+
+/* ================= CARD ================= */
+function Card({ label, value, color }: any) {
+  return (
+    <div className="bg-[#0b1220] border border-gray-700 p-2">
+      <div className="text-[10px] opacity-60">{label}</div>
+      <div className={`text-sm font-bold ${color || ''}`}>{value}</div>
     </div>
   );
 }
