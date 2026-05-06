@@ -24,12 +24,10 @@ type SensorData = {
   rpm: number;
 };
 
-type AlarmLevel = 'NORMAL' | 'WARNING' | 'CRITICAL';
-
 type EventLog = {
   id: string;
   time: string;
-  type: AlarmLevel;
+  type: 'NORMAL' | 'WARNING' | 'CRITICAL';
   tag: string;
   value: number;
   message: string;
@@ -88,7 +86,7 @@ export default function Page() {
       client.subscribe('smartfarm/jeho123/data');
     });
 
-    client.on('message', (_topic: string, payload: any) => {
+    client.on('message', (_topic, payload: any) => {
       const msg = JSON.parse(payload.toString());
 
       const data: SensorData = {
@@ -104,35 +102,27 @@ export default function Page() {
       setSensors(data);
       setHistory(prev => [...prev.slice(-120), data]);
 
-      /* ================= SCADA ALARM ENGINE ================= */
-
-      const ecLevel: AlarmLevel =
-        data.ec < 1.5 ? 'NORMAL' : data.ec < 3 ? 'WARNING' : 'CRITICAL';
-
-      const phLevel: AlarmLevel =
-        data.ph >= 6 && data.ph <= 7
-          ? 'NORMAL'
-          : data.ph >= 5.5 && data.ph <= 7.5
+      /* ================= SIMPLE ALARM ================= */
+      const level =
+        data.ec > 3 || data.ph < 5.5 || data.ph > 7.5
+          ? 'CRITICAL'
+          : data.ec > 1.5
           ? 'WARNING'
-          : 'CRITICAL';
+          : 'NORMAL';
 
-      const pushEvent = (tag: string, value: number, level: AlarmLevel) => {
-        if (level === 'NORMAL') return;
-
-        const ev: EventLog = {
-          id: cryptoFallback(),
-          time: new Date().toLocaleTimeString(),
-          type: level,
-          tag,
-          value,
-          message: `${tag} anomaly: ${value}`,
-        };
-
-        setEvents(prev => [ev, ...prev].slice(0, 100));
-      };
-
-      pushEvent('EC', data.ec, ecLevel);
-      pushEvent('PH', data.ph, phLevel);
+      if (level !== 'NORMAL') {
+        setEvents(prev => [
+          {
+            id: cryptoFallback(),
+            time: new Date().toLocaleTimeString(),
+            type: level,
+            tag: 'SYSTEM',
+            value: data.ec,
+            message: `Anomaly detected`,
+          },
+          ...prev,
+        ].slice(0, 80));
+      }
     });
 
     return () => client.end();
@@ -153,40 +143,39 @@ export default function Page() {
   };
 
   /* ================= UI COLORS ================= */
-  const ecColor =
+  const statusColor =
     sensors.ec < 1.5 ? 'text-green-400' :
     sensors.ec < 3 ? 'text-yellow-400' : 'text-red-500';
 
-  const phColor =
-    sensors.ph >= 6 && sensors.ph <= 7
-      ? 'text-green-400'
-      : sensors.ph >= 5.5 && sensors.ph <= 7.5
-      ? 'text-yellow-400'
-      : 'text-red-500';
-
+  /* ================= UI ================= */
   return (
-    <div className="min-h-screen bg-[#05070f] text-white p-4">
+    <div className="min-h-screen bg-[#05070f] text-white p-4 font-mono">
 
+      {/* HEADER */}
       <div className="border-b border-gray-700 pb-2">
-        <h1 className="text-lg font-bold">SCADA DASHBOARD</h1>
-        <div className="text-xs opacity-60">{time}</div>
+        <h1 className="text-lg tracking-widest text-cyan-300">
+          SMART FARM SCADA SYSTEM
+        </h1>
+        <div className="text-[11px] opacity-60">{time}</div>
       </div>
 
-      {/* STATUS */}
-      <div className="grid grid-cols-6 gap-2 mt-4 text-sm">
-        <Card label="TEMP" value={sensors.temperature} />
-        <Card label="HUMID" value={sensors.humidity} />
-        <Card label="EC" value={sensors.ec} color={ecColor} />
-        <Card label="PH" value={sensors.ph} color={phColor} />
-        <Card label="WATER" value={sensors.waterTemp} />
-        <Card label="LUX" value={sensors.lux} />
+      {/* TOP STATUS PANEL */}
+      <div className="grid grid-cols-6 gap-2 mt-4 text-xs">
+
+        <Box label="TEMP" value={sensors.temperature} />
+        <Box label="HUM" value={sensors.humidity} />
+        <Box label="EC" value={sensors.ec} color={statusColor} />
+        <Box label="PH" value={sensors.ph} />
+        <Box label="WATER" value={sensors.waterTemp} />
+        <Box label="LUX" value={sensors.lux} />
+
       </div>
 
-      {/* RPM */}
+      {/* RPM GAUGE */}
       <div className="mt-6 bg-[#0b1220] border border-gray-700 p-4">
-        <div className="text-xs opacity-70">PUMP RPM</div>
+        <div className="text-xs text-gray-400 mb-2">PUMP SPEED (RPM)</div>
 
-        <div className="relative w-44 h-44 mx-auto">
+        <div className="relative w-48 h-48 mx-auto">
           <div className="absolute inset-0 rounded-full border-4 border-gray-700" />
 
           <div
@@ -202,8 +191,10 @@ export default function Page() {
         </div>
       </div>
 
-      {/* WAVE */}
+      {/* CHART */}
       <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
+        <div className="text-xs mb-2 text-gray-400">REALTIME WAVEFORM</div>
+
         <ResponsiveContainer width="100%" height={240}>
           <AreaChart data={history}>
             <CartesianGrid stroke="#1f2937" />
@@ -219,9 +210,9 @@ export default function Page() {
         </ResponsiveContainer>
       </div>
 
-      {/* EVENTS */}
+      {/* EVENT LOG */}
       <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
-        <div className="text-xs mb-2">ALARM LOG</div>
+        <div className="text-xs text-gray-400 mb-2">ALARM HISTORY</div>
 
         <div className="text-xs space-y-1 max-h-40 overflow-auto">
           {events.map(e => (
@@ -238,28 +229,32 @@ export default function Page() {
         </div>
       </div>
 
-      {/* CONTROL */}
+      {/* CONTROL PANEL */}
       <div className="grid grid-cols-4 gap-2 mt-6">
+
         {Object.keys(controls).map(k => (
           <button
             key={k}
             onClick={() => toggle(k)}
-            className={`p-3 border text-xs ${
-              controls[k] ? 'border-green-400' : 'border-red-500'
+            className={`p-3 border text-xs tracking-wider ${
+              controls[k]
+                ? 'border-green-400 text-green-300'
+                : 'border-red-500 text-red-400'
             }`}
           >
             {k.toUpperCase()}
           </button>
         ))}
+
       </div>
 
     </div>
   );
 }
 
-/* ================= SAFE CARD ================= */
+/* ================= BOX ================= */
 
-function Card({
+function Box({
   label,
   value,
   color,
@@ -269,18 +264,17 @@ function Card({
   color?: string;
 }) {
   return (
-    <div className="bg-[#0b1220] border border-gray-700 p-2">
-      <div className="text-[10px] opacity-60">{label}</div>
+    <div className="bg-[#0b1220] border border-gray-700 p-2 text-center">
+      <div className="text-[10px] text-gray-400">{label}</div>
       <div className={`text-sm font-bold ${color || ''}`}>{value}</div>
     </div>
   );
 }
 
-/* ================= SAFE UUID ================= */
+/* ================= SAFE ID ================= */
 
 function cryptoFallback() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).substring(2);
+  return typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
 }
