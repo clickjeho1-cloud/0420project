@@ -38,7 +38,7 @@ type EventLog = {
 export default function Page() {
   const mqttRef = useRef<mqtt.MqttClient | null>(null);
 
-  const [time, setTime] = useState('');
+  const [time, setTime] = useState<string>('');
   const [history, setHistory] = useState<SensorData[]>([]);
   const [events, setEvents] = useState<EventLog[]>([]);
 
@@ -64,6 +64,7 @@ export default function Page() {
     const t = setInterval(() => {
       setTime(new Date().toLocaleString());
     }, 1000);
+
     return () => clearInterval(t);
   }, []);
 
@@ -86,39 +87,41 @@ export default function Page() {
       client.subscribe('smartfarm/jeho123/data');
     });
 
-    client.on('message', (_topic, payload: any) => {
+    client.on('message', (_topic: string, payload: Buffer) => {
       const msg = JSON.parse(payload.toString());
 
       const data: SensorData = {
-        temperature: msg.temperature ?? 0,
-        humidity: msg.humidity ?? 0,
-        ec: msg.ec ?? 0,
-        ph: msg.ph ?? 0,
-        waterTemp: msg.waterTemp ?? 0,
-        lux: msg.lux ?? 0,
-        rpm: msg.rpm ?? 0,
+        temperature: Number(msg.temperature ?? 0),
+        humidity: Number(msg.humidity ?? 0),
+        ec: Number(msg.ec ?? 0),
+        ph: Number(msg.ph ?? 0),
+        waterTemp: Number(msg.waterTemp ?? 0),
+        lux: Number(msg.lux ?? 0),
+        rpm: Number(msg.rpm ?? 0),
       };
 
       setSensors(data);
       setHistory(prev => [...prev.slice(-120), data]);
 
-      /* ================= SIMPLE ALARM ================= */
-      const level =
-        data.ec > 3 || data.ph < 5.5 || data.ph > 7.5
-          ? 'CRITICAL'
-          : data.ec > 1.5
-          ? 'WARNING'
-          : 'NORMAL';
+      /* ================= SIMPLE SCADA ALERT ================= */
+      const isCritical =
+        data.ec > 3 || data.ph < 5.5 || data.ph > 7.5;
+
+      const isWarning =
+        data.ec > 1.5;
+
+      const level: EventLog['type'] =
+        isCritical ? 'CRITICAL' : isWarning ? 'WARNING' : 'NORMAL';
 
       if (level !== 'NORMAL') {
         setEvents(prev => [
           {
-            id: cryptoFallback(),
+            id: cryptoId(),
             time: new Date().toLocaleTimeString(),
             type: level,
             tag: 'SYSTEM',
             value: data.ec,
-            message: `Anomaly detected`,
+            message: 'Anomaly detected',
           },
           ...prev,
         ].slice(0, 80));
@@ -129,7 +132,7 @@ export default function Page() {
   }, []);
 
   /* ================= CONTROL ================= */
-  const toggle = (key: string) => {
+  const toggle = (key: keyof typeof controls) => {
     setControls(prev => {
       const next = !prev[key];
 
@@ -142,10 +145,13 @@ export default function Page() {
     });
   };
 
-  /* ================= UI COLORS ================= */
+  /* ================= COLORS ================= */
   const statusColor =
-    sensors.ec < 1.5 ? 'text-green-400' :
-    sensors.ec < 3 ? 'text-yellow-400' : 'text-red-500';
+    sensors.ec < 1.5
+      ? 'text-green-400'
+      : sensors.ec < 3
+      ? 'text-yellow-400'
+      : 'text-red-500';
 
   /* ================= UI ================= */
   return (
@@ -159,7 +165,7 @@ export default function Page() {
         <div className="text-[11px] opacity-60">{time}</div>
       </div>
 
-      {/* TOP STATUS PANEL */}
+      {/* STATUS GRID */}
       <div className="grid grid-cols-6 gap-2 mt-4 text-xs">
 
         <Box label="TEMP" value={sensors.temperature} />
@@ -193,7 +199,6 @@ export default function Page() {
 
       {/* CHART */}
       <div className="mt-6 bg-[#0b1220] border border-gray-700 p-3">
-        <div className="text-xs mb-2 text-gray-400">REALTIME WAVEFORM</div>
 
         <ResponsiveContainer width="100%" height={240}>
           <AreaChart data={history}>
@@ -208,6 +213,7 @@ export default function Page() {
             <Area type="monotone" dataKey="ph" stroke="#ffd24d" />
           </AreaChart>
         </ResponsiveContainer>
+
       </div>
 
       {/* EVENT LOG */}
@@ -216,13 +222,16 @@ export default function Page() {
 
         <div className="text-xs space-y-1 max-h-40 overflow-auto">
           {events.map(e => (
-            <div key={e.id} className={
-              e.type === 'CRITICAL'
-                ? 'text-red-500'
-                : e.type === 'WARNING'
-                ? 'text-yellow-400'
-                : 'text-green-400'
-            }>
+            <div
+              key={e.id}
+              className={
+                e.type === 'CRITICAL'
+                  ? 'text-red-500'
+                  : e.type === 'WARNING'
+                  ? 'text-yellow-400'
+                  : 'text-green-400'
+              }
+            >
               [{e.time}] {e.message}
             </div>
           ))}
@@ -232,7 +241,7 @@ export default function Page() {
       {/* CONTROL PANEL */}
       <div className="grid grid-cols-4 gap-2 mt-6">
 
-        {Object.keys(controls).map(k => (
+        {(Object.keys(controls) as (keyof typeof controls)[]).map(k => (
           <button
             key={k}
             onClick={() => toggle(k)}
@@ -273,7 +282,7 @@ function Box({
 
 /* ================= SAFE ID ================= */
 
-function cryptoFallback() {
+function cryptoId() {
   return typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2);
