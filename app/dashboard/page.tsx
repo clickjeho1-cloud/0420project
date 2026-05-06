@@ -75,8 +75,8 @@ export default function Page() {
     const client = mqtt.connect(
       'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
       {
-        username: process.env.NEXT_PUBLIC_MQTT_USER || '',
-        password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
+        username: process.env.NEXT_PUBLIC_MQTT_USER || 'jhk001',
+        password: process.env.NEXT_PUBLIC_MQTT_PASS || 'Sinwonpark1!',
         reconnectPeriod: 2000,
         connectTimeout: 5000,
       }
