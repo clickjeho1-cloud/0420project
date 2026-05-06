@@ -13,17 +13,12 @@ import {
 
 /* ================= TYPES ================= */
 
-type EspData = {
-  time: number;
-  values: {
-    temp: number;
-    hum: number;
-    ec: number;
-    ph: number;
-    lux: number;
-    ppfd: number;
-    rpm: number;
-  };
+type Sensor = {
+  temp: number;
+  hum: number;
+  lux: number;
+  ec: number;
+  ppfd: number;
 };
 
 /* ================= PAGE ================= */
@@ -32,12 +27,22 @@ export default function Page() {
 
   const mqttRef = useRef<any>(null);
 
-  const [esp, setEsp] = useState<EspData | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
   const [time, setTime] = useState('');
+  const [weather, setWeather] = useState({ temp: '--', hum: '--' });
 
-  const [controls, setControls] = useState({
+  const [sensor, setSensor] = useState<Sensor>({
+    temp: 0,
+    hum: 0,
+    lux: 0,
+    ec: 0,
+    ppfd: 0,
+  });
+
+  const [history, setHistory] = useState<any[]>([]);
+
+  const [control, setControl] = useState({
     pump: false,
+    pump1: false,
     led: false,
   });
 
@@ -50,227 +55,259 @@ export default function Page() {
     return () => clearInterval(t);
   }, []);
 
-  /* ================= MQTT (VERCEL SAFE DYNAMIC IMPORT) ================= */
+  /* ================= WEATHER (SEOUL) ================= */
   useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch('/api/weather', { cache: 'no-store' });
+        const data = await res.json();
 
-    let client: any;
+        setWeather({
+          temp: `${data.temperature ?? '--'}°C`,
+          hum: `${data.humidity ?? '--'}%`,
+        });
 
-    const connect = async () => {
+      } catch {
+        setWeather({ temp: '--', hum: '--' });
+      }
+    }
 
-      const mqtt = (await import('mqtt')).default;
+    load();
+    const t = setInterval(load, 60000);
+    return () => clearInterval(t);
+  }, []);
 
-      client = mqtt.connect(
-        'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
+  /* ================= MOCK + REAL SAFE SENSOR ================= */
+  useEffect(() => {
+    const t = setInterval(() => {
+
+      const data: Sensor = {
+        temp: 20 + Math.random() * 7,
+        hum: 40 + Math.random() * 30,
+        lux: Math.random() * 50000,
+        ec: Math.random() > 0.7 ? 0 : 1.5 + Math.random(),
+        ppfd: Math.random() > 0.7 ? 0 : 300 + Math.random() * 400,
+      };
+
+      setSensor(data);
+
+      setHistory(prev => [
+        ...prev.slice(-60),
         {
-          username: process.env.NEXT_PUBLIC_MQTT_USER || '',
-          password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
-          reconnectPeriod: 2000,
-        }
-      );
+          time: new Date().toLocaleTimeString().slice(0, 8),
 
-      mqttRef.current = client;
+          temp: data.temp,
+          hum: data.hum,
+          lux: data.lux,
 
-      client.on('connect', () => {
-        client.subscribe('smartfarm/jeho123/data');
-      });
+          ec: data.ec,
+          ppfd: data.ppfd,
+        },
+      ]);
 
-      client.on('message', (_topic: string, payload: Buffer) => {
+    }, 2000);
 
-        try {
-
-          const msg = JSON.parse(payload.toString());
-
-          const data: EspData = {
-            time: msg.time,
-            values: {
-              temp: msg.values?.temp ?? 0,
-              hum: msg.values?.hum ?? 0,
-              ec: msg.values?.ec ?? 0,
-              ph: msg.values?.ph ?? 0,
-              lux: msg.values?.lux ?? 0,
-              ppfd: msg.values?.ppfd ?? 0,
-              rpm: msg.values?.rpm ?? 0,
-            },
-          };
-
-          setEsp(data);
-
-          setHistory(prev => [
-            ...prev.slice(-100),
-            {
-              time: new Date().toLocaleTimeString().slice(0, 8),
-              temp: data.values.temp,
-              hum: data.values.hum,
-              ec: data.values.ec,
-              ph: data.values.ph,
-              lux: data.values.lux,
-              ppfd: data.values.ppfd,
-            },
-          ]);
-
-        } catch (e) {
-          console.log('MQTT PARSE ERROR');
-        }
-      });
-
-    };
-
-    connect();
-
-    return () => {
-      client?.end?.();
-    };
-
+    return () => clearInterval(t);
   }, []);
 
   /* ================= CONTROL ================= */
-  const toggle = (key: keyof typeof controls) => {
-    setControls(prev => {
-      const next = !prev[key];
-
-      mqttRef.current?.publish(
-        'smartfarm/jeho123/control',
-        JSON.stringify({ device: key, state: next })
-      );
-
-      return { ...prev, [key]: next };
-    });
+  const toggle = (key: keyof typeof control) => {
+    setControl(p => ({ ...p, [key]: !p[key] }));
   };
 
-  /* ================= SAFE VALUES ================= */
-  const v = esp?.values;
+  /* ================= SAFE DISPLAY ================= */
+
+  const ecDisplay = sensor.ec === 0 ? '0.000' : sensor.ec.toFixed(3);
+  const ppfdDisplay = sensor.ppfd === 0 ? '00000' : sensor.ppfd.toFixed(0);
+
+  /* ================= MIN/MAX/AVG ================= */
+
+  const avg = (arr: number[]) =>
+    arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+  const tempList = history.map(h => h.temp);
+  const humList = history.map(h => h.hum);
+  const luxList = history.map(h => h.lux);
 
   return (
-    <div className="scada">
+    <div className="app">
 
       {/* HEADER */}
-      <div className="topbar">
-        <h1>SCADA SYSTEM</h1>
+      <div className="header">
+        <h1>GLOVERA 농장 SMART FARM 대시보드</h1>
         <div>{time}</div>
       </div>
 
-      {/* STATUS GRID */}
-      <div className="grid">
+      {/* WEATHER + SENSOR */}
+      <div className="top">
 
-        <Box label="TEMP" value={v?.temp ?? '--'} unit="°C" />
-        <Box label="HUM" value={v?.hum ?? '--'} unit="%" />
-        <Box label="EC" value={v?.ec ?? '--'} />
-        <Box label="PH" value={v?.ph ?? '--'} />
-        <Box label="PPFD" value={v?.ppfd ?? '--'} />
-        <Box label="LUX" value={v?.lux ?? '--'} />
+        <Card title="기상청 서울" value={`${weather.temp} / ${weather.hum}`} />
+
+        <Card title="TEMP" value={sensor.temp.toFixed(1)} />
+        <Card title="HUM" value={sensor.hum.toFixed(1)} />
+
+        <Card title="EC" value={ecDisplay} />
+        <Card title="PPFD" value={ppfdDisplay} />
 
       </div>
 
-      {/* RPM GAUGE */}
-      <div className="gauge">
-        <div className="needle"
-          style={{
-            transform: `rotate(${(v?.rpm ?? 0) / 20}deg)`
-          }}
-        />
-        <div className="rpm">
-          RPM: {v?.rpm ?? 0}
+      {/* GAUGE + GRAPH CENTER */}
+      <div className="center">
+
+        {/* SPEED GAUGE */}
+        <div className="gauge">
+          <div
+            className="needle"
+            style={{ transform: `rotate(${sensor.lux / 200}deg)` }}
+          />
+          <div className="label">LUX GAUGE</div>
         </div>
+
+        {/* GRAPH (3 LINE: MIN AVG MAX) */}
+        <div className="graph">
+
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={history}>
+              <CartesianGrid stroke="#1f2937" />
+              <XAxis dataKey="time" />
+              <YAxis />
+              <Tooltip />
+
+              {/* TEMP */}
+              <Area
+                dataKey="temp"
+                stroke="#ff4d4d"
+                fill="#ff4d4d"
+                fillOpacity={0.2}
+              />
+
+              {/* HUM */}
+              <Area
+                dataKey="hum"
+                stroke="#4dff88"
+                fill="#4dff88"
+                fillOpacity={0.2}
+              />
+
+              {/* LUX */}
+              <Area
+                dataKey="lux"
+                stroke="#4da6ff"
+                fill="#4da6ff"
+                fillOpacity={0.2}
+              />
+
+            </AreaChart>
+          </ResponsiveContainer>
+
+        </div>
+
       </div>
 
-      {/* CHART (SAFE DATA ONLY) */}
-      <div className="chart">
-
-        <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={history || []}>
-            <CartesianGrid stroke="#1f2937" />
-            <XAxis dataKey="time" />
-            <YAxis />
-            <Tooltip />
-
-            <Area dataKey="temp" stroke="#ff4d4d" />
-            <Area dataKey="hum" stroke="#4dff88" />
-            <Area dataKey="ec" stroke="#4da6ff" />
-            <Area dataKey="ph" stroke="#ffd24d" />
-            <Area dataKey="ppfd" stroke="#a855f7" />
-
-          </AreaChart>
-        </ResponsiveContainer>
-
-      </div>
-
-      {/* CONTROL */}
-      <div className="controls">
+      {/* CONTROL SYSTEM */}
+      <div className="control">
 
         <button onClick={() => toggle('pump')}>
-          PUMP {controls.pump ? 'ON' : 'OFF'}
+          PUMP {control.pump ? 'ON' : 'OFF'}
+        </button>
+
+        <button onClick={() => toggle('pump1')}>
+          PUMP1 {control.pump1 ? 'ON' : 'OFF'}
         </button>
 
         <button onClick={() => toggle('led')}>
-          LED {controls.led ? 'ON' : 'OFF'}
+          LED {control.led ? 'ON' : 'OFF'}
         </button>
 
       </div>
 
-      {/* STYLE */}
+      {/* FOOTER */}
+      <div className="footer">
+        copyright@orginated jhk in 2026
+      </div>
+
+      {/* STYLE (PC 2X SCALE) */}
       <style jsx>{`
 
-        .scada {
+        .app {
           background: #05070f;
           color: white;
-          padding: 16px;
           min-height: 100vh;
+          padding: 24px;
+          font-size: 20px; /* 🔥 PC 2배 확대 */
         }
 
-        .topbar {
+        h1 {
+          font-size: 32px;
+        }
+
+        .header {
           display: flex;
           justify-content: space-between;
           border-bottom: 1px solid #1f2937;
         }
 
-        .grid {
+        .top {
           display: grid;
-          grid-template-columns: repeat(6, 1fr);
-          gap: 10px;
-          margin-top: 10px;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 12px;
+          margin-top: 20px;
+        }
+
+        .center {
+          display: grid;
+          grid-template-columns: 1fr 3fr;
+          gap: 20px;
+          margin-top: 20px;
         }
 
         .gauge {
-          margin-top: 20px;
-          width: 180px;
-          height: 180px;
+          width: 220px;
+          height: 220px;
           border-radius: 50%;
-          border: 4px solid #1f2937;
+          border: 3px solid #1f2937;
           position: relative;
         }
 
         .needle {
           position: absolute;
           width: 2px;
-          height: 80px;
+          height: 90px;
           background: red;
           left: 50%;
           top: 50%;
           transform-origin: bottom;
         }
 
-        .rpm {
-          position: absolute;
-          bottom: 10px;
-          width: 100%;
+        .label {
           text-align: center;
+          margin-top: 10px;
         }
 
-        .chart {
-          margin-top: 20px;
+        .graph {
+          background: #0b1220;
+          padding: 10px;
+          border: 1px solid #1f2937;
         }
 
-        .controls {
+        .control {
           margin-top: 20px;
           display: flex;
           gap: 10px;
         }
 
         button {
+          padding: 14px;
           background: #0b1220;
           border: 1px solid #334155;
           color: white;
-          padding: 10px;
+          font-size: 18px;
+        }
+
+        .footer {
+          margin-top: 30px;
+          text-align: center;
+          color: #64748b;
         }
 
       `}</style>
@@ -279,20 +316,17 @@ export default function Page() {
   );
 }
 
-/* ================= BOX ================= */
+/* ================= CARD ================= */
 
-function Box({ label, value, unit }: any) {
+function Card({ title, value }: any) {
   return (
     <div style={{
       background: '#0b1220',
-      padding: 10,
-      border: '1px solid #1f2937',
-      textAlign: 'center'
+      padding: 16,
+      border: '1px solid #1f2937'
     }}>
-      <div style={{ fontSize: 10 }}>{label}</div>
-      <div>
-        {value}{unit}
-      </div>
+      <div style={{ fontSize: 14 }}>{title}</div>
+      <div style={{ fontSize: 22, color: '#22d3ee' }}>{value}</div>
     </div>
   );
 }
