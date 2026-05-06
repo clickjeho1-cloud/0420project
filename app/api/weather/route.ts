@@ -1,10 +1,22 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // 쿼리 파라미터에서 위도/경도 가져오기
+    const { searchParams } = new URL(request.url);
+    let lat = searchParams.get('lat');
+    let lon = searchParams.get('lon');
+
+    // 기본값: 서울 (역삼동 근처) 37.4979, 127.0276
+    // 또는 서울 중심 37.5665, 126.9780
+    if (!lat || !lon) {
+      lat = '37.5665';
+      lon = '126.9780';
+    }
+
     // Open-Meteo 단기예보 API (습도, 강수량, 풍향 등 포함)
     const res = await fetch(
-      'https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day,cloud_cover&timezone=Asia/Seoul',
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,is_day,cloud_cover&timezone=Asia/Seoul`,
       {
         cache: 'no-store',
       }
@@ -40,6 +52,21 @@ export async function GET() {
       99: '뇌우',
     };
 
+    // 좌표에서 지역명 추측 (간단한 매핑)
+    let locationName = '알 수 없음';
+    const latNum = parseFloat(lat);
+    const lonNum = parseFloat(lon);
+
+    if (latNum > 37.4 && latNum < 37.7 && lonNum > 126.7 && lonNum < 127.2) {
+      if (latNum > 37.49 && latNum < 37.51 && lonNum > 127.02 && lonNum < 127.04) {
+        locationName = '역삼동';
+      } else if (latNum < 37.57) {
+        locationName = '강남';
+      } else {
+        locationName = '서울';
+      }
+    }
+
     return NextResponse.json({
       timestamp: current.time,
       temperature: current.temperature_2m,
@@ -50,7 +77,8 @@ export async function GET() {
       windDirection: current.wind_direction_10m,
       cloudCover: current.cloud_cover,
       isDay: current.is_day,
-      location: '서울 (Seoul)',
+      location: locationName,
+      coordinates: { lat: parseFloat(lat), lon: parseFloat(lon) },
     });
   } catch (error) {
     console.error('날씨 API 오류:', error);

@@ -12,12 +12,24 @@ type JournalImage = {
   green_score: number;
 };
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (!supabase) {
     return NextResponse.json({ success: false, error: 'Supabase not configured' }, { status: 500 });
   }
 
   try {
+    const url = new URL(request.url);
+    if (url.searchParams.get('schema') === 'true') {
+      const { data, error } = await supabase
+        .from('information_schema.columns')
+        .select('column_name,data_type,udt_name')
+        .eq('table_name', 'journals');
+      if (error) {
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, data });
+    }
+
     const { data, error } = await supabase
       .from('journals')
       .select('*, journal_images(*)')
@@ -51,10 +63,27 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { date, height, leafSize, waterAmount, notes, images } = body;
 
+    console.log('📝 Journal POST 요청:', { date, height, leafSize, waterAmount, notes });
+
+    // 빈 문자열을 null로 변환 (Supabase numeric 타입 호환성)
+    const journalData = {
+      date: date || null,
+      height: height && height !== '' ? height : null,
+      leafSize: leafSize && leafSize !== '' ? leafSize : null,
+      waterAmount: waterAmount && waterAmount !== '' ? waterAmount : null,
+      notes: notes || '',
+    };
+
+    console.log('📝 변환된 데이터:', journalData);
+
     const { data, error } = await supabase
       .from('journals')
-      .insert([{ date, height, leafSize, waterAmount, notes }])
+      .insert([journalData])
       .select();
+
+    if (error) {
+      console.error('❌ Supabase 에러:', error);
+    }
 
     if (error || !data || !data.length) {
       return NextResponse.json({ success: false, error: error?.message ?? 'Journal insert failed' }, { status: 400 });

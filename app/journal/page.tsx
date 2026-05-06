@@ -172,17 +172,20 @@ export default function JournalWritePage() {
         imagesPayload = await uploadJournalImages(images, analysisResults);
       }
 
+      const payload = {
+        date: formData.date,
+        height: formData.height ? parseFloat(formData.height) : null,
+        leafSize: formData.leafSize ? parseFloat(formData.leafSize) : null,
+        waterAmount: formData.waterAmount ? parseFloat(formData.waterAmount) : null,
+        notes: formData.notes,
+        images: imagesPayload,
+      };
+      console.log('📤 POST payload:', payload);
+
       const response = await fetch('/api/journal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date: formData.date,
-          height: formData.height ? parseFloat(formData.height) : null,
-          leafSize: formData.leafSize ? parseFloat(formData.leafSize) : null,
-          waterAmount: formData.waterAmount ? parseFloat(formData.waterAmount) : null,
-          notes: formData.notes,
-          images: imagesPayload,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();

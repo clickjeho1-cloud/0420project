@@ -356,35 +356,66 @@ function Gauge({ value, min, max, label, unit, color }: GaugeProps) {
 
 function WeatherWidget() {
   const [weather, setWeather] = useState<any>(null);
+  const [location, setLocation] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    async function fetchWeather() {
+    async function fetchWeatherByLocation() {
       try {
-        const res = await fetch('/api/weather');
-        const data = await res.json();
-        setWeather(data);
+        // 사용자 위치 가져오기 (지오로케이션 API)
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            setLocation({ lat: latitude, lon: longitude });
+
+            // 내 API 라우트로 위치 기반 날씨 가져오기
+            const res = await fetch(`/api/weather?lat=${latitude}&lon=${longitude}`);
+            const data = await res.json();
+            setWeather(data);
+          },
+          (error) => {
+            console.warn('위치 접근 거부, 기본값 사용:', error);
+            // 기본값: 서울 (역삼동 근처)
+            fetch(`/api/weather?lat=37.4979&lon=127.0276`)
+              .then(res => res.json())
+              .then(data => {
+                setLocation({ lat: 37.4979, lon: 127.0276, name: '역삼동' });
+                setWeather(data);
+              });
+          }
+        );
       } catch (e) {
         console.error('날씨 정보 로드 실패:', e);
+      } finally {
+        setLoading(false);
       }
     }
-    fetchWeather();
-    const t = setInterval(fetchWeather, 600000); // 10분마다 업데이트
+
+    fetchWeatherByLocation();
+    const t = setInterval(fetchWeatherByLocation, 600000); // 10분마다 업데이트
     return () => clearInterval(t);
   }, []);
-  
-  if (!weather) return <div className="weather-panel">날씨 정보 불러오는 중...</div>;
-  
+
+  if (loading || !weather) {
+    return <div className="weather-panel">📍 위치 기반 날씨 정보 불러오는 중...</div>;
+  }
+
   return (
     <div className="weather-panel">
-      <h3>📍 {weather.location} 날씨</h3>
+      <h3>
+        📍 {location?.name ? `${location.name}` : `${location?.lat?.toFixed(4)}, ${location?.lon?.toFixed(4)}`} 
+        ({weather.location}) - {weather.weatherDescription}
+      </h3>
       <div className="weather-details">
         <div className="weather-info">
-          <strong>{weather.weatherDescription}</strong>
-          <p>온도: {weather.temperature}°C</p>
-          <p>습도: {weather.humidity}%</p>
-          <p>풍속: {weather.windspeed} m/s</p>
-          <p>풍향: {weather.windDirection}°</p>
-          <p>구름: {weather.cloudCover}%</p>
-          <p style={{ fontSize: '12px', color: '#94a3b8' }}>업데이트: {new Date(weather.timestamp).toLocaleTimeString('ko-KR')}</p>
+          <p>🌡️ 온도: <strong>{weather.temperature}°C</strong></p>
+          <p>💧 습도: <strong>{weather.humidity}%</strong></p>
+          <p>💨 풍속: <strong>{weather.windspeed} m/s</strong></p>
+          <p>🧭 풍향: <strong>{weather.windDirection}°</strong></p>
+          <p>☁️ 구름: <strong>{weather.cloudCover}%</strong></p>
+          <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '8px' }}>
+            업데이트: {new Date(weather.timestamp).toLocaleTimeString('ko-KR')}
+          </p>
         </div>
       </div>
     </div>
