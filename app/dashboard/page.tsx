@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import mqtt from 'mqtt';
+import mqtt, { MqttClient } from 'mqtt';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from 'recharts';
 
-/* ================= TYPE ================= */
+/* ================= TYPES ================= */
 
 type Sensor = {
   temp: number;
@@ -21,6 +21,10 @@ type Sensor = {
   ec: number;
   ph: number;
   ppfd: number;
+};
+
+type HistoryItem = Sensor & {
+  time: string;
 };
 
 const EMPTY: Sensor = {
@@ -32,19 +36,28 @@ const EMPTY: Sensor = {
   ppfd: 0,
 };
 
+/* ================= HELPERS ================= */
+
+const normalize = (msg: any): Sensor => ({
+  temp: msg?.values?.temp ?? msg?.temp ?? 0,
+  hum: msg?.values?.hum ?? msg?.hum ?? 0,
+  lux: msg?.values?.lux ?? 0,
+  ec: msg?.values?.ec ?? 0,
+  ph: msg?.values?.ph ?? 0,
+  ppfd: msg?.values?.ppfd ?? 0,
+});
+
 /* ================= PAGE ================= */
 
 export default function Page() {
-
-  const clientRef = useRef<any>(null);
-  const reconnectRef = useRef<any>(null);
+  const clientRef = useRef<MqttClient | null>(null);
 
   const [sensor, setSensor] = useState<Sensor>(EMPTY);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [status, setStatus] =
     useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
 
-  const [time, setTime] = useState('');
+  const [time, setTime] = useState<string>('');
 
   const [control, setControl] = useState({
     pump: false,
@@ -54,124 +67,89 @@ export default function Page() {
 
   /* ================= CLOCK ================= */
   useEffect(() => {
+    setTime(new Date().toLocaleString());
+
     const t = setInterval(() => {
       setTime(new Date().toLocaleString());
     }, 1000);
+
     return () => clearInterval(t);
   }, []);
 
-  /* ================= NORMALIZE ================= */
-  const normalize = (msg: any): Sensor => ({
-    temp: msg?.values?.temp ?? msg?.temp ?? 0,
-    hum: msg?.values?.hum ?? msg?.hum ?? 0,
-    lux: msg?.values?.lux ?? 0,
-    ec: msg?.values?.ec ?? 0,
-    ph: msg?.values?.ph ?? 0,
-    ppfd: msg?.values?.ppfd ?? 0,
-  });
-
   /* ================= MQTT ================= */
-  const connectMQTT = () => {
-
-    try {
-
-      setStatus('CONNECTING');
-
-      const client = mqtt.connect(
-        'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
-        {
-          username: process.env.NEXT_PUBLIC_MQTT_USER || '',
-          password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
-          reconnectPeriod: 2000,
-          connectTimeout: 5000,
-        }
-      );
-
-      clientRef.current = client;
-
-      client.on('connect', () => {
-        setStatus('CONNECTED');
-        client.subscribe('smartfarm/jeho123/data');
-      });
-
-      client.on('error', () => {
-        setStatus('DISCONNECTED');
-        scheduleReconnect();
-      });
-
-      client.on('close', () => {
-        setStatus('DISCONNECTED');
-        scheduleReconnect();
-      });
-
-      client.on('message', (_: any, payload: any) => {
-
-        try {
-
-          const msg = JSON.parse(payload.toString());
-          const data = normalize(msg);
-
-          setSensor(data);
-
-          setHistory(prev => [
-            ...prev.slice(-120),
-            {
-              time: new Date().toLocaleTimeString().slice(0, 8),
-              ...data,
-            },
-          ]);
-
-        } catch {
-          // SCADA safe fail
-        }
-
-      });
-
-    } catch {
-      setStatus('DISCONNECTED');
-      scheduleReconnect();
-    }
-
-  };
-
-  /* ================= AUTO RECONNECT ================= */
-  const scheduleReconnect = () => {
-
-    if (reconnectRef.current) return;
-
-    reconnectRef.current = setTimeout(() => {
-      reconnectRef.current = null;
-      connectMQTT();
-    }, 3000);
-
-  };
-
   useEffect(() => {
+    setStatus('CONNECTING');
 
-    connectMQTT();
+    const client = mqtt.connect(
+      'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
+      {
+        username: process.env.NEXT_PUBLIC_MQTT_USER || '',
+        password: process.env.NEXT_PUBLIC_MQTT_PASS || '',
+        reconnectPeriod: 2000,
+        connectTimeout: 5000,
+      }
+    );
+
+    clientRef.current = client;
+
+    client.on('connect', () => {
+      setStatus('CONNECTED');
+      client.subscribe('smartfarm/jeho123/data');
+    });
+
+    client.on('reconnect', () => {
+      setStatus('CONNECTING');
+    });
+
+    client.on('offline', () => {
+      setStatus('DISCONNECTED');
+    });
+
+    client.on('error', (err) => {
+      console.error('MQTT Error: ', err);
+      setStatus('DISCONNECTED');
+    });
+
+    client.on('message', (topic, payload) => {
+      try {
+        const msg = JSON.parse(payload.toString());
+        const data = normalize(msg);
+
+        setSensor(data);
+
+        setHistory((prev) => [
+          ...prev.slice(-120),
+          {
+            time: new Date().toLocaleTimeString().slice(0, 8),
+            ...data,
+          },
+        ]);
+      } catch {
+        // SCADA safe fail
+      }
+    });
 
     return () => {
-      clientRef.current?.end?.();
-      clearTimeout(reconnectRef.current);
+      if (clientRef.current) {
+        clientRef.current.end();
+      }
     };
-
   }, []);
 
   /* ================= CONTROL ================= */
   const toggle = (key: keyof typeof control) => {
-
-    setControl(prev => {
-
+    setControl((prev) => {
       const next = !prev[key];
 
-      clientRef.current?.publish(
-        'smartfarm/jeho123/control',
-        JSON.stringify({ device: key, state: next })
-      );
+      if (clientRef.current && clientRef.current.connected) {
+        clientRef.current.publish(
+          'smartfarm/jeho123/control',
+          JSON.stringify({ device: key, state: next })
+        );
+      }
 
       return { ...prev, [key]: next };
     });
-
   };
 
   const v = sensor ?? EMPTY;
@@ -223,11 +201,11 @@ export default function Page() {
             <YAxis />
             <Tooltip />
 
-            <Area dataKey="temp" stroke="#ff4d4d" fill="#ff4d4d" />
-            <Area dataKey="hum" stroke="#4dff88" fill="#4dff88" />
-            <Area dataKey="lux" stroke="#4da6ff" fill="#4da6ff" />
-            <Area dataKey="ec" stroke="#facc15" fill="#facc15" />
-            <Area dataKey="ph" stroke="#a855f7" fill="#a855f7" />
+            <Area type="monotone" dataKey="temp" stroke="#ff4d4d" fill="#ff4d4d" />
+            <Area type="monotone" dataKey="hum" stroke="#4dff88" fill="#4dff88" />
+            <Area type="monotone" dataKey="lux" stroke="#4da6ff" fill="#4da6ff" />
+            <Area type="monotone" dataKey="ec" stroke="#facc15" fill="#facc15" />
+            <Area type="monotone" dataKey="ph" stroke="#a855f7" fill="#a855f7" />
 
           </AreaChart>
 
@@ -300,6 +278,11 @@ export default function Page() {
           background: #0b1220;
           border: 1px solid #334155;
           color: white;
+          cursor: pointer;
+        }
+
+        button:hover {
+          background: #1e293b;
         }
 
         .footer {
@@ -308,11 +291,17 @@ export default function Page() {
           color: #64748b;
         }
 
-        .status.CONNECTED { color: #22c55e; }
-        .status.CONNECTING { color: #facc15; }
-        .status.DISCONNECTED { color: #ef4444; }
+        .status.CONNECTED {
+          color: #22c55e;
+        }
+        .status.CONNECTING {
+          color: #facc15;
+        }
+        .status.DISCONNECTED {
+          color: #ef4444;
+        }
 
-        .box {
+        :global(.box) {
           background: #0b1220;
           padding: 12px;
           border: 1px solid #1f2937;
@@ -327,7 +316,12 @@ export default function Page() {
 
 /* ================= BOX ================= */
 
-function Box({ label, value }: any) {
+type BoxProps = {
+  label: string;
+  value: number | string;
+};
+
+function Box({ label, value }: BoxProps) {
   return (
     <div className="box">
       <div>{label}</div>
