@@ -57,24 +57,11 @@ export default function Page() {
   const [status, setStatus] =
     useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
 
-  const [time, setTime] = useState<string>('');
-
   const [control, setControl] = useState({
     pump: false,
     pump1: false,
     led: false,
   });
-
-  /* ================= CLOCK ================= */
-  useEffect(() => {
-    setTime(new Date().toLocaleString());
-
-    const t = setInterval(() => {
-      setTime(new Date().toLocaleString());
-    }, 1000);
-
-    return () => clearInterval(t);
-  }, []);
 
   /* ================= MQTT ================= */
   useEffect(() => {
@@ -167,7 +154,7 @@ export default function Page() {
           MQTT: {status}
         </div>
 
-        <div>{time}</div>
+        <Clock />
 
       </div>
 
@@ -201,11 +188,11 @@ export default function Page() {
             <YAxis />
             <Tooltip />
 
-            <Area type="monotone" dataKey="temp" stroke="#ff4d4d" fill="#ff4d4d" />
-            <Area type="monotone" dataKey="hum" stroke="#4dff88" fill="#4dff88" />
-            <Area type="monotone" dataKey="lux" stroke="#4da6ff" fill="#4da6ff" />
-            <Area type="monotone" dataKey="ec" stroke="#facc15" fill="#facc15" />
-            <Area type="monotone" dataKey="ph" stroke="#a855f7" fill="#a855f7" />
+            <Area isAnimationActive={false} type="monotone" dataKey="temp" stroke="#ff4d4d" fill="#ff4d4d" />
+            <Area isAnimationActive={false} type="monotone" dataKey="hum" stroke="#4dff88" fill="#4dff88" />
+            <Area isAnimationActive={false} type="monotone" dataKey="lux" stroke="#4da6ff" fill="#4da6ff" />
+            <Area isAnimationActive={false} type="monotone" dataKey="ec" stroke="#facc15" fill="#facc15" />
+            <Area isAnimationActive={false} type="monotone" dataKey="ph" stroke="#a855f7" fill="#a855f7" />
 
           </AreaChart>
 
@@ -312,6 +299,22 @@ export default function Page() {
 
     </div>
   );
+}
+
+/* ================= CLOCK ================= */
+
+function Clock() {
+  const [time, setTime] = useState<string>('');
+
+  useEffect(() => {
+    setTime(new Date().toLocaleString());
+    const t = setInterval(() => {
+      setTime(new Date().toLocaleString());
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  return <div>{time}</div>;
 }
 
 /* ================= BOX ================= */
