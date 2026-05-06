@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
+/* ================= TYPES ================= */
 type JournalEntry = {
   id: number;
   date: string;
@@ -12,6 +13,7 @@ type JournalEntry = {
   notes: string;
 };
 
+/* ================= PAGE ================= */
 export default function JournalListPage() {
   const [journals, setJournals] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +37,7 @@ export default function JournalListPage() {
     fetchJournals();
   }, []);
 
+  /* ================= UI ================= */
   return (
     <div className="list-container">
       <div className="header">

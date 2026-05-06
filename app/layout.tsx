@@ -1,37 +1,8 @@
-import './globals.css';
-import type { Metadata, Viewport } from 'next';
+import Navbar from './components/Navbar';
 
-export const metadata: Metadata = {
-  title: {
-    default: 'Smart Farm Control',
-    template: '%s | Smart Farm',
-  },
-  description: 'AI 기반 스마트팜 제어 및 모니터링 시스템',
-
-  manifest: '/manifest.json',
-
-  icons: {
-    icon: '/icon.png',
-    apple: '/icon.png',
-  },
-
-  applicationName: 'Smart Farm',
-
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'Smart Farm',
-  },
-
-  formatDetection: {
-    telephone: false,
-  },
-};
-
-export const viewport: Viewport = {
-  themeColor: '#00ffcc',
-  width: 'device-width',
-  initialScale: 1,
+export const metadata = {
+  title: 'Glovera Smart Farm',
+  description: '스마트팜 통합 관제 대시보드 및 영농일지',
 };
 
 export default function RootLayout({
@@ -41,26 +12,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <head>
-        {/* iOS 스플래시 화면 */}
-        <link rel="apple-touch-startup-image" href="/splash.png" />
-      </head>
-
-      <body>
+      <body style={{ margin: 0, padding: 0, backgroundColor: '#05070f' }}>
+        <Navbar />
         {children}
-
-        {/* 서비스워커 등록 */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function () {
-                  navigator.serviceWorker.register('/sw.js');
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   );
