@@ -30,9 +30,35 @@ export async function GET(request: NextRequest) {
     const daily = data.daily ?? {};
 
     const currentTime = current?.time;
-    const currentIndex = Array.isArray(hourly.time)
-      ? hourly.time.findIndex((time: string) => time === currentTime)
-      : -1;
+    
+    // 현재 시간의 인덱스를 더 유연하게 찾기
+    let currentIndex = -1;
+    if (Array.isArray(hourly.time) && currentTime) {
+      // 정확한 매칭 시도
+      currentIndex = hourly.time.findIndex((time: string) => time === currentTime);
+      
+      // 정확한 매칭이 실패하면 가장 가까운 시간 찾기
+      if (currentIndex === -1 && hourly.time.length > 0) {
+        const currentDate = currentTime.split('T')[0];
+        const currentHour = currentTime.split('T')[1]?.substring(0, 2);
+        
+        // 같은 날짜에서 가장 가까운 시간 찾기
+        for (let i = 0; i < hourly.time.length; i++) {
+          const timeStr = hourly.time[i];
+          if (timeStr.startsWith(currentDate)) {
+            if (currentHour && timeStr.includes(currentHour + ':')) {
+              currentIndex = i;
+              break;
+            }
+          }
+        }
+        
+        // 여전히 못 찾으면 첫 번째 시간대 사용
+        if (currentIndex === -1) {
+          currentIndex = 0;
+        }
+      }
+    }
 
     const humidity = currentIndex >= 0 && Array.isArray(hourly.relativehumidity_2m)
       ? hourly.relativehumidity_2m[currentIndex]

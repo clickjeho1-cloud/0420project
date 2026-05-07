@@ -438,13 +438,13 @@ function WeatherWidget() {
       <div className="weather-details">
         <div className="weather-grid">
           <div className="weather-card"><strong>온도</strong><span>{weather.temperature ?? '-'}°C</span></div>
-          <div className="weather-card"><strong>습도</strong><span>{weather.humidity ?? '-'}%</span></div>
+          <div className="weather-card"><strong>습도</strong><span>{weather.humidity ? `${weather.humidity}%` : '-'}</span></div>
           <div className="weather-card"><strong>자외선 지수</strong><span>{weather.uvIndex ?? '-'} </span></div>
-          <div className="weather-card"><strong>미세먼지 PM10</strong><span>{weather.pm10 ?? '-'} μg/m³</span></div>
-          <div className="weather-card"><strong>미세먼지 PM2.5</strong><span>{weather.pm2_5 ?? '-'} μg/m³</span></div>
+          <div className="weather-card"><strong>미세먼지 PM10</strong><span>{weather.pm10 ? `${weather.pm10.toFixed(1)}` : '-'} μg/m³</span></div>
+          <div className="weather-card"><strong>미세먼지 PM2.5</strong><span>{weather.pm2_5 ? `${weather.pm2_5.toFixed(1)}` : '-'} μg/m³</span></div>
           <div className="weather-card"><strong>일출</strong><span>{formatTime(weather.sunrise)}</span></div>
           <div className="weather-card"><strong>일몰</strong><span>{formatTime(weather.sunset)}</span></div>
-          <div className="weather-card"><strong>구름</strong><span>{weather.cloudCover ?? '-'}%</span></div>
+          <div className="weather-card"><strong>구름</strong><span>{weather.cloudCover ? `${weather.cloudCover}%` : '-'}</span></div>
         </div>
         <div className="weather-meta">
           <p>☁️ 날씨: <strong>{weather.weatherDescription}</strong></p>
