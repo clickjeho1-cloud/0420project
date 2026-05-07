@@ -289,8 +289,8 @@ export default function JournalWritePage() {
             onChange={handleImageChange}
           />
           <p className="hint">4:3 비율 권장. 최대 3개까지 선택하세요.</p>
-          <p className="hint">사진은 Supabase Storage의 버킷 `journal-images`에 저장됩니다.</p>
-          <p className="hint">버킷 내 저장 경로는 `journal-images/{timestamp}-{index}-{파일명}`입니다.</p>
+          <p className="hint">사진은 Supabase Storage의 버킷 journal-images 에 저장됩니다.</p>
+          <p className="hint">버킷 내 저장 경로는 journal-images/timestamp-index-파일명 형식입니다.</p>
           {imageWarning ? <div className="hint warning">{imageWarning}</div> : null}
         </div>
 
@@ -298,7 +298,7 @@ export default function JournalWritePage() {
           <div className="image-preview-grid">
             {images.map((file, index) => (
               <div key={file.name + index} className="image-card">
-                <img src={imagePreviews[index]} alt={file.name} />
+                {imagePreviews[index] && <img src={imagePreviews[index]} alt={`Preview of ${file.name}`} />}
                 <div className="image-meta">
                   <strong>{file.name}</strong>
                   <div>사이즈: {Math.round(file.size / 1024)}KB</div>
