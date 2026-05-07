@@ -281,12 +281,18 @@ export default function Page() {
         .nav-links { display: flex; gap: 16px; }
         .nav-link { color: #2563eb; text-decoration: none; font-weight: bold; }
         .nav-link:hover { color: #1d4ed8; }
-        .weather-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
-        .weather-panel h3 { margin-top: 0; color: #e2e8f0; font-size: 18px; }
-        .weather-details { background: #111827; padding: 12px; border-radius: 8px; }
-        .weather-info { color: #cbd5e1; line-height: 1.6; }
-        .weather-info strong { color: #f8fafc; font-size: 16px; display: block; margin-bottom: 8px; }
-        .weather-info p { margin: 4px 0; font-size: 14px; }
+        .weather-panel { background: #0b1220; padding: 18px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
+        .weather-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+        .weather-panel h3 { margin: 0; color: #e2e8f0; font-size: 18px; }
+        .weather-coordinates { text-align: right; color: #94a3b8; font-size: 14px; line-height: 1.5; }
+        .weather-details { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; background: #111827; padding: 16px; border-radius: 8px; }
+        .weather-grid { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 12px; }
+        .weather-card { background: #0f172a; padding: 14px; border: 1px solid #334155; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between; color: #cbd5e1; }
+        .weather-card strong { color: #f8fafc; margin-bottom: 8px; font-size: 14px; }
+        .weather-card span { font-size: 16px; font-weight: 700; }
+        .weather-meta { color: #cbd5e1; display: flex; flex-direction: column; justify-content: space-between; }
+        .weather-meta p { margin: 8px 0; font-size: 15px; }
+        .weather-meta strong { color: #f8fafc; }
         .recommendation-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
         .recommendation-panel h2 { margin-top: 0; color: #94a3b8; margin-bottom: 12px; }
         .recommendation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
@@ -359,6 +365,20 @@ function WeatherWidget() {
   const [location, setLocation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const formatCoordinate = (value: number | null | undefined, type: 'lat' | 'lon') => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '-';
+    const abs = Math.abs(value).toFixed(4);
+    const direction = type === 'lat' ? (value >= 0 ? '북위' : '남위') : (value >= 0 ? '동경' : '서경');
+    return `${direction} ${abs}°`;
+  };
+
+  const formatTime = (value: string | null | undefined) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value.replace('T', ' ');
+    return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  };
+
   useEffect(() => {
     async function fetchWeatherByLocation() {
       try {
@@ -402,19 +422,36 @@ function WeatherWidget() {
 
   return (
     <div className="weather-panel">
-      <h3>
-        📍 {location?.name ? `${location.name}` : `${location?.lat?.toFixed(4)}, ${location?.lon?.toFixed(4)}`} 
-        ({weather.location}) - {weather.weatherDescription}
-      </h3>
+      <div className="weather-panel-header">
+        <h3>📍 기상청 표시 ({weather.location})</h3>
+        <div className="weather-coordinates">
+          {weather.coordinates ? (
+            <>
+              <div>{formatCoordinate(weather.coordinates.lat, 'lat')}</div>
+              <div>{formatCoordinate(weather.coordinates.lon, 'lon')}</div>
+            </>
+          ) : (
+            <div>{location?.name ?? '위치 정보 없음'}</div>
+          )}
+        </div>
+      </div>
       <div className="weather-details">
-        <div className="weather-info">
-          <p>🌡️ 온도: <strong>{weather.temperature}°C</strong></p>
-          <p>💧 습도: <strong>{weather.humidity}%</strong></p>
-          <p>💨 풍속: <strong>{weather.windspeed} m/s</strong></p>
-          <p>🧭 풍향: <strong>{weather.windDirection}°</strong></p>
-          <p>☁️ 구름: <strong>{weather.cloudCover}%</strong></p>
-          <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '8px' }}>
-            업데이트: {new Date(weather.timestamp).toLocaleTimeString('ko-KR')}
+        <div className="weather-grid">
+          <div className="weather-card"><strong>온도</strong><span>{weather.temperature ?? '-'}°C</span></div>
+          <div className="weather-card"><strong>습도</strong><span>{weather.humidity ?? '-'}%</span></div>
+          <div className="weather-card"><strong>자외선 지수</strong><span>{weather.uvIndex ?? '-'} </span></div>
+          <div className="weather-card"><strong>미세먼지 PM10</strong><span>{weather.pm10 ?? '-'} μg/m³</span></div>
+          <div className="weather-card"><strong>미세먼지 PM2.5</strong><span>{weather.pm2_5 ?? '-'} μg/m³</span></div>
+          <div className="weather-card"><strong>일출</strong><span>{formatTime(weather.sunrise)}</span></div>
+          <div className="weather-card"><strong>일몰</strong><span>{formatTime(weather.sunset)}</span></div>
+          <div className="weather-card"><strong>구름</strong><span>{weather.cloudCover ?? '-'}%</span></div>
+        </div>
+        <div className="weather-meta">
+          <p>☁️ 날씨: <strong>{weather.weatherDescription}</strong></p>
+          <p>💨 풍속: <strong>{weather.windspeed ?? '-'} m/s</strong></p>
+          <p>🧭 풍향: <strong>{weather.windDirection ?? '-'}°</strong></p>
+          <p style={{ marginTop: 8, fontSize: 14, color: '#94a3b8' }}>
+            업데이트: {weather.timestamp ? new Date(weather.timestamp).toLocaleTimeString('ko-KR') : '-'}
           </p>
         </div>
       </div>

@@ -21,6 +21,9 @@ vercel Project Settings → Root Directory 설정
 src==.
 
 //
+
 git add .
 git commit -m "fix supabase api key"
-git push -f origin main  
+git push -f origin main  ///
+
+git clone https://github.com/clickjeho1-cloud/0420project.git  백업명령
