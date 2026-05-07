@@ -289,7 +289,8 @@ export default function JournalWritePage() {
             onChange={handleImageChange}
           />
           <p className="hint">4:3 비율 권장. 최대 3개까지 선택하세요.</p>
-          <p className="hint">사진은 Supabase Storage의 `journal-images` 버킷 내부 `journal-images/` 경로에 저장됩니다.</p>
+          <p className="hint">사진은 Supabase Storage의 버킷 `journal-images`에 저장됩니다.</p>
+          <p className="hint">버킷 내 저장 경로는 `journal-images/{timestamp}-{index}-{파일명}`입니다.</p>
           {imageWarning ? <div className="hint warning">{imageWarning}</div> : null}
         </div>
 
