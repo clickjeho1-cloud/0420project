@@ -33,6 +33,8 @@ export async function GET(request: NextRequest) {
     
     // 현재 시간의 인덱스를 더 유연하게 찾기
     let currentIndex = -1;
+    let nearbyIndices: number[] = [];
+    
     if (Array.isArray(hourly.time) && currentTime) {
       // 정확한 매칭 시도
       currentIndex = hourly.time.findIndex((time: string) => time === currentTime);
@@ -40,41 +42,73 @@ export async function GET(request: NextRequest) {
       // 정확한 매칭이 실패하면 가장 가까운 시간 찾기
       if (currentIndex === -1 && hourly.time.length > 0) {
         const currentDate = currentTime.split('T')[0];
-        const currentHour = currentTime.split('T')[1]?.substring(0, 2);
+        const currentHour = parseInt(currentTime.split('T')[1]?.substring(0, 2) || '0');
         
-        // 같은 날짜에서 가장 가까운 시간 찾기
+        // 같은 날짜에서 가장 가까운 시간 찾기 (현재 시간 ±2시간 범위)
         for (let i = 0; i < hourly.time.length; i++) {
           const timeStr = hourly.time[i];
           if (timeStr.startsWith(currentDate)) {
-            if (currentHour && timeStr.includes(currentHour + ':')) {
-              currentIndex = i;
-              break;
+            const hourStr = timeStr.split('T')[1]?.substring(0, 2);
+            if (hourStr) {
+              const hour = parseInt(hourStr);
+              if (Math.abs(hour - currentHour) <= 2) {
+                nearbyIndices.push(i);
+              }
             }
           }
         }
         
-        // 여전히 못 찾으면 첫 번째 시간대 사용
-        if (currentIndex === -1) {
+        // 가장 가까운 시간 선택
+        if (nearbyIndices.length > 0) {
+          currentIndex = nearbyIndices[0];
+        } else {
+          // 여전히 못 찾으면 첫 번째 시간대 사용
           currentIndex = 0;
         }
       }
     }
 
-    const humidity = currentIndex >= 0 && Array.isArray(hourly.relativehumidity_2m)
-      ? hourly.relativehumidity_2m[currentIndex]
-      : null;
-    const uvIndex = currentIndex >= 0 && Array.isArray(hourly.uv_index)
-      ? hourly.uv_index[currentIndex]
-      : null;
-    const pm10 = currentIndex >= 0 && Array.isArray(hourly.pm10)
-      ? hourly.pm10[currentIndex]
-      : null;
-    const pm2_5 = currentIndex >= 0 && Array.isArray(hourly.pm2_5)
-      ? hourly.pm2_5[currentIndex]
-      : null;
-    const cloudCover = currentIndex >= 0 && Array.isArray(hourly.cloudcover)
-      ? hourly.cloudcover[currentIndex]
-      : null;
+    // 신뢰할 수 있는 습도 값 계산 (현재 시간 ±2시간 평균)
+    let humidity = null;
+    let humidityConfidence = 'low';
+    
+    if (currentIndex >= 0 && Array.isArray(hourly.relativehumidity_2m)) {
+      if (nearbyIndices.length >= 3) {
+        // 여러 시간대의 평균값 사용 (더 신뢰성 높음)
+        const values = nearbyIndices
+          .map(idx => hourly.relativehumidity_2m[idx])
+          .filter(val => val !== null && val !== undefined);
+        if (values.length > 0) {
+          humidity = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+          humidityConfidence = 'high';
+        }
+      } else {
+        // 단일 값 사용
+        humidity = hourly.relativehumidity_2m[currentIndex];
+        humidityConfidence = 'medium';
+      }
+    }
+    // 신뢰할 수 있는 날씨 데이터 계산 함수
+    const getReliableValue = (array: any[], indices: number[], fallbackIndex: number) => {
+      if (!Array.isArray(array)) return null;
+      
+      if (indices.length >= 3) {
+        // 여러 시간대의 평균값 사용
+        const values = indices
+          .map(idx => array[idx])
+          .filter(val => val !== null && val !== undefined && !isNaN(val));
+        return values.length > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / values.length * 100) / 100 : null;
+      } else if (fallbackIndex >= 0) {
+        // 단일 값 사용
+        return array[fallbackIndex];
+      }
+      return null;
+    };
+
+    const uvIndex = getReliableValue(hourly.uv_index, nearbyIndices, currentIndex);
+    const pm10 = getReliableValue(hourly.pm10, nearbyIndices, currentIndex);
+    const pm2_5 = getReliableValue(hourly.pm2_5, nearbyIndices, currentIndex);
+    const cloudCover = getReliableValue(hourly.cloudcover, nearbyIndices, currentIndex);
 
     const todayDate = currentTime?.split('T')[0] ?? null;
     const todayIndex = todayDate && Array.isArray(daily.time)
@@ -149,6 +183,15 @@ export async function GET(request: NextRequest) {
       pm2_5,
       sunrise,
       sunset,
+      // 신뢰성 정보 추가
+      dataQuality: {
+        humidity: humidityConfidence,
+        uvIndex: nearbyIndices.length >= 3 ? 'high' : nearbyIndices.length >= 1 ? 'medium' : 'low',
+        airQuality: nearbyIndices.length >= 3 ? 'high' : nearbyIndices.length >= 1 ? 'medium' : 'low',
+        overall: nearbyIndices.length >= 3 ? 'high' : nearbyIndices.length >= 1 ? 'medium' : 'low'
+      },
+      lastUpdated: new Date().toISOString(),
+      dataSource: 'Open-Meteo (무료 API)',
     });
   } catch (error) {
     console.error('날씨 API 오류:', error);

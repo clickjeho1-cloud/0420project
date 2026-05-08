@@ -448,11 +448,28 @@ function WeatherWidget() {
         </div>
         <div className="weather-meta">
           <p>☁️ 날씨: <strong>{weather.weatherDescription}</strong></p>
-          <p>💨 풍속: <strong>{weather.windspeed ?? '-'} m/s</strong></p>
-          <p>🧭 풍향: <strong>{weather.windDirection ?? '-'}°</strong></p>
+          <p>💨 풍속: <strong>{weather.windspeed ? `${weather.windspeed} m/s` : '-'}</strong></p>
+          <p>🧭 풍향: <strong>{weather.windDirection ? `${weather.windDirection}°` : '-'}</strong></p>
           <p style={{ marginTop: 8, fontSize: 14, color: '#94a3b8' }}>
             업데이트: {weather.timestamp ? new Date(weather.timestamp).toLocaleTimeString('ko-KR') : '-'}
           </p>
+          {weather.dataQuality && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>
+              <p>📊 데이터 신뢰도: 
+                <span style={{ 
+                  color: weather.dataQuality.overall === 'high' ? '#10b981' : 
+                         weather.dataQuality.overall === 'medium' ? '#f59e0b' : '#ef4444',
+                  fontWeight: 'bold'
+                }}>
+                  {weather.dataQuality.overall === 'high' ? ' 높음' : 
+                   weather.dataQuality.overall === 'medium' ? ' 보통' : ' 낮음'}
+                </span>
+              </p>
+              <p style={{ fontSize: 11, marginTop: 4 }}>
+                출처: {weather.dataSource || 'Open-Meteo'}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
