@@ -96,8 +96,8 @@ export default function JournalListPage() {
                                 {img.health_description.split(' ')[0]}
                               </div>
                             )}
-                            {img.avg_brightness !== undefined && (
-                              <div className="image-stats">☀️{img.avg_brightness}% 🌱{img.green_score}%</div>
+                            {img.avg_brightness != null && (
+                              <div className="image-stats">☀️ {img.avg_brightness}% 🌱 {img.green_score}%</div>
                             )}
                           </div>
                         ))}
@@ -133,7 +133,7 @@ export default function JournalListPage() {
         .health-fair { background: #f59e0b; color: #fffbeb; }
         .health-poor { background: #ef4444; color: #fef2f2; }
         .health-unknown { background: #6b7280; color: #f3f4f6; }
-        .image-stats { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+        .image-stats { font-size: 11px; color: #e2e8f0; background: #1e293b; padding: 3px 6px; border-radius: 4px; white-space: nowrap; border: 1px solid #334155; margin-top: 2px; }
         .images-col { min-width: 140px; }
         table { width: 100%; border-collapse: collapse; text-align: center; }
         th { background: #1e293b; color: #f8fafc; padding: 14px; font-weight: bold; border-bottom: 2px solid #334155; }
