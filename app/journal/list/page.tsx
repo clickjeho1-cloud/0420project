@@ -100,7 +100,7 @@ export default function JournalListPage() {
                         ))}
                       </div>
                     ) : (
-                      '-'
+                      <span style={{ color: '#64748b', fontSize: '14px' }}>사진 없음</span>
                     )}
                   </td>
                 </tr>
