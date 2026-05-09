@@ -96,8 +96,8 @@ export default function JournalListPage() {
                                 {img.health_description.split(' ')[0]}
                               </div>
                             )}
-                            {img.avg_brightness != null && (
-                              <div className="image-stats">☀️ {img.avg_brightness}% 🌱 {img.green_score}%</div>
+                            {typeof img.avg_brightness === 'number' && (
+                              <div className="image-stats">☀️{img.avg_brightness}% 🌱{img.green_score}%</div>
                             )}
                           </div>
                         ))}
@@ -124,16 +124,16 @@ export default function JournalListPage() {
         .loading, .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 18px; }
         
         .table-wrapper { background: #0b1220; border: 1px solid #1f2937; border-radius: 8px; overflow: hidden; }
-        .thumbnail-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-        .image-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-        .thumbnail-row img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid #334155; }
+        .thumbnail-row { display: flex; gap: 10px; justify-content: flex-start; flex-wrap: wrap; padding: 4px; }
+        .image-item { display: flex; flex-direction: column; align-items: center; gap: 5px; background: #0f172a; padding: 8px; border-radius: 8px; border: 1px solid #1e293b; }
+        .thumbnail-row img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #334155; }
         .health-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
         .health-excellent { background: #10b981; color: #ecfdf5; }
         .health-good { background: #3b82f6; color: #eff6ff; }
         .health-fair { background: #f59e0b; color: #fffbeb; }
         .health-poor { background: #ef4444; color: #fef2f2; }
         .health-unknown { background: #6b7280; color: #f3f4f6; }
-        .image-stats { font-size: 11px; color: #e2e8f0; background: #1e293b; padding: 3px 6px; border-radius: 4px; white-space: nowrap; border: 1px solid #334155; margin-top: 2px; }
+        .image-stats { font-size: 11px; color: #94a3b8; background: #05070f; padding: 4px 6px; border-radius: 4px; white-space: nowrap; border: 1px solid #1f2937; letter-spacing: -0.5px; }
         .images-col { min-width: 140px; }
         table { width: 100%; border-collapse: collapse; text-align: center; }
         th { background: #1e293b; color: #f8fafc; padding: 14px; font-weight: bold; border-bottom: 2px solid #334155; }
