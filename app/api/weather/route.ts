@@ -7,8 +7,8 @@ export async function GET(request: NextRequest) {
     let lon = searchParams.get('lon');
 
     if (!lat || !lon) {
-      lat = '37.5665';
-      lon = '126.9780';
+      lat = '37.545';
+      lon = '127.123';
     }
 
     const params = new URLSearchParams({
@@ -156,7 +156,9 @@ export async function GET(request: NextRequest) {
     const lonNum = parseFloat(lon);
 
     if (latNum > 37.4 && latNum < 37.7 && lonNum > 126.7 && lonNum < 127.2) {
-      if (latNum > 37.49 && latNum < 37.51 && lonNum > 127.02 && lonNum < 127.04) {
+      if (Math.abs(latNum - 37.545) < 0.02 && Math.abs(lonNum - 127.123) < 0.02) {
+        locationName = '천호동';
+      } else if (latNum > 37.49 && latNum < 37.51 && lonNum > 127.02 && lonNum < 127.04) {
         locationName = '역삼동';
       } else if (latNum < 37.57) {
         locationName = '강남';

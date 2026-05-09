@@ -446,7 +446,7 @@ export default function JournalWritePage() {
         .submit-btn { background: #2563eb; color: white; padding: 12px 24px; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; }
         .submit-btn:hover:not(:disabled) { background: #1d4ed8; }
         .submit-btn:disabled { background: #374151; cursor: not-allowed; }
-        .alert { padding: 14px 16px; border-radius: 10px; margin-bottom: 20px; font-weight: 600; }
+        .alert { padding: 14px 16px; border-radius: 10px; margin: 0 auto 20px auto; font-weight: 600; max-width: 600px; }
         .alert.error { background: #7f1d1d; color: #fee2e2; border: 1px solid #991b1b; }
         .alert.success { background: #064e3b; color: #d1fae5; border: 1px solid #065f46; }
         .alert pre { 

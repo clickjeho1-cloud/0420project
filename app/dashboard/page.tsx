@@ -383,28 +383,14 @@ function WeatherWidget() {
   useEffect(() => {
     async function fetchWeatherByLocation() {
       try {
-        // 사용자 위치 가져오기 (지오로케이션 API)
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            setLocation({ lat: latitude, lon: longitude });
-
-            // 내 API 라우트로 위치 기반 날씨 가져오기
-            const res = await fetch(`/api/weather?lat=${latitude}&lon=${longitude}`);
-            const data = await res.json();
-            setWeather(data);
-          },
-          (error) => {
-            console.warn('위치 접근 거부, 기본값 사용:', error);
-            // 기본값: 서울 (역삼동 근처)
-            fetch(`/api/weather?lat=37.4979&lon=127.0276`)
-              .then(res => res.json())
-              .then(data => {
-                setLocation({ lat: 37.4979, lon: 127.0276, name: '역삼동' });
-                setWeather(data);
-              });
-          }
-        );
+        // 천호동 격자/좌표로 고정 (사용자 위치 추적 대신 지정된 위치 사용)
+        const lat = 37.545;
+        const lon = 127.123;
+        setLocation({ lat, lon, name: '천호동' });
+        
+        const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+        const data = await res.json();
+        setWeather(data);
       } catch (e) {
         console.error('날씨 정보 로드 실패:', e);
       } finally {
