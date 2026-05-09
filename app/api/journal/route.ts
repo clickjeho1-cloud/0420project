@@ -33,16 +33,23 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { date, height, leafSize, waterAmount, notes, images } = body;
 
+    // 💡 빈 글자나 공백이 들어오면 무조건 null로 변환하는 안전 함수
+    const parseNum = (val: any) => {
+      if (val === null || val === undefined || String(val).trim() === '') return null;
+      const num = Number(val);
+      return isNaN(num) ? null : num;
+    };
+
     // 1. 영농일지(텍스트 데이터) 저장
     const { data: journal, error: journalError } = await supabase
       .from('journals')
       .insert([
         {
           date,
-          // 값이 비어있으면 데이터베이스 에러 방지를 위해 확실하게 null 처리
-          height: height || null,
-          "leafSize": leafSize || null,
-          "waterAmount": waterAmount || null,
+          // 안전 함수를 사용하여 빈 칸이나 공백은 null로 변환하여 에러 원천 차단
+          height: parseNum(height),
+          "leafSize": parseNum(leafSize),
+          "waterAmount": parseNum(waterAmount),
           notes: notes || null
         }
       ])
