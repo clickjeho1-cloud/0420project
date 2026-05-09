@@ -90,11 +90,14 @@ export default function JournalListPage() {
                         {journal.journal_images.map((img) => (
                           <div key={img.id} className="image-item">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={img.public_url} alt={img.file_name} title={`밝기: ${img.avg_brightness}%, 녹색: ${img.green_score}%`} />
+                            <img src={img.public_url} alt={img.file_name} />
                             {img.health_description && (
                               <div className={`health-badge health-${img.crop_health || 'unknown'}`}>
                                 {img.health_description.split(' ')[0]}
                               </div>
+                            )}
+                            {img.avg_brightness !== undefined && (
+                              <div className="image-stats">☀️{img.avg_brightness}% 🌱{img.green_score}%</div>
                             )}
                           </div>
                         ))}
@@ -123,13 +126,14 @@ export default function JournalListPage() {
         .table-wrapper { background: #0b1220; border: 1px solid #1f2937; border-radius: 8px; overflow: hidden; }
         .thumbnail-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
         .image-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-        .thumbnail-row img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid #334155; cursor: help; }
+        .thumbnail-row img { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid #334155; }
         .health-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
         .health-excellent { background: #10b981; color: #ecfdf5; }
         .health-good { background: #3b82f6; color: #eff6ff; }
         .health-fair { background: #f59e0b; color: #fffbeb; }
         .health-poor { background: #ef4444; color: #fef2f2; }
         .health-unknown { background: #6b7280; color: #f3f4f6; }
+        .image-stats { font-size: 11px; color: #94a3b8; white-space: nowrap; }
         .images-col { min-width: 140px; }
         table { width: 100%; border-collapse: collapse; text-align: center; }
         th { background: #1e293b; color: #f8fafc; padding: 14px; font-weight: bold; border-bottom: 2px solid #334155; }
