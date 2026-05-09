@@ -101,7 +101,13 @@ export default function JournalListPage() {
                         {journal.journal_images.map((img) => (
                           <div key={img.id} className="image-item">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={img.public_url} alt={img.file_name} />
+                            <img 
+                              src={img.public_url} 
+                              alt={img.file_name} 
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/0f172a/64748b?text=Format+Error';
+                              }}
+                            />
                             {img.health_description && (
                               <div className={`health-badge health-${img.crop_health || 'unknown'}`}>
                                 {img.health_description.split(' ')[0]}
