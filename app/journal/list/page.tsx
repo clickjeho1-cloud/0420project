@@ -24,6 +24,17 @@ type JournalEntry = {
   journal_images?: JournalImage[];
 };
 
+/* ================= 조치 사항(개선점) 도우미 함수 ================= */
+const getActionTip = (health?: string) => {
+  switch(health) {
+    case 'excellent': return '✨ 현재 환경 유지';
+    case 'good': return '💧 꾸준한 관찰 요망';
+    case 'fair': return '☀️ 광량 및 수분 점검';
+    case 'poor': return '🚨 영양/환경 적극 개선';
+    default: return '🔍 재촬영 요망';
+  }
+};
+
 /* ================= PAGE ================= */
 export default function JournalListPage() {
   const [journals, setJournals] = useState<JournalEntry[]>([]);
@@ -97,13 +108,13 @@ export default function JournalListPage() {
                               </div>
                             )}
                             {typeof img.avg_brightness === 'number' && (
-                              <div className="image-stats">☀️{img.avg_brightness}% 🌱{img.green_score}%</div>
+                              <div className="image-stats">{getActionTip(img.crop_health)}</div>
                             )}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <span style={{ color: '#64748b', fontSize: '14px' }}>사진 없음</span>
+              <span style={{ color: '#64748b', fontSize: '14px' }}>사진 없음</span>
                     )}
                   </td>
                 </tr>
