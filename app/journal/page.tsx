@@ -57,6 +57,7 @@ export default function JournalWritePage() {
     const urls = images.map((file) => URL.createObjectURL(file));
     setImagePreviews(urls);
     return () => urls.forEach((url) => URL.revokeObjectURL(url));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images]);
 
   const analyzeImage = (file: File): Promise<ImageAnalysis> => {

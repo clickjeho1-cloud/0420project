@@ -158,6 +158,7 @@ export default function Page() {
     }
 
     fetchSuggestion();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [history, v.temp, v.hum, v.ec, v.ph, v.ppfd, v.nutTemp]);
 
   return (
