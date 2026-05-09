@@ -32,7 +32,8 @@ export default function JournalListPage() {
   useEffect(() => {
     async function fetchJournals() {
       try {
-        const response = await fetch('/api/journal');
+        // 캐시를 무시하고 항상 서버에 최신 데이터를 요청
+        const response = await fetch('/api/journal', { cache: 'no-store' });
         const result = await response.json();
         
         if (result.success) {

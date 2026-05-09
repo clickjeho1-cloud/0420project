@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Next.js 캐싱 무효화 (항상 DB에서 최신 데이터를 가져오도록 강제)
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Supabase 클라이언트 초기화 (서버 환경)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
