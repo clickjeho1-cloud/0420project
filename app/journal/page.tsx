@@ -462,7 +462,49 @@ export default function JournalWritePage() {
         .image-preview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
         .image-card { background: #111827; border: 1px solid #334155; border-radius: 10px; overflow: hidden; }
         .image-card img { width: 100%; height: auto; display: block; }
-        .image-meta { padding: 12px; color: #cbd5e1; font-size: 14px; }
+        .image-meta { paddin# ... 기존 Supabase 설정들 ...
+        
+        # 👇 이 세 줄이 정확히 있는지 확인하세요! (앞뒤에 띄어쓰기나 따옴표가 없어야 합니다)
+        HIVEMQ_HOST=763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud
+        HIVEMQ_USERNAME=설정하신_아이디
+        HIVEMQ_PASSWORD=설정하신_비밀번호
+        # ... 기존 Supabase 설정들 ...
+        
+        # 👇 이 세 줄이 정확히 있는지 확인하세요! (앞뒤에 띄어쓰기나 따옴표가 없어야 합니다)
+        HIVEMQ_HOST=763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud
+        HIVEMQ_USERNAME=설정하신_아이디
+        HIVEMQ_PASSWORD=설정하신_비밀번호
+        # ... 기존 Supabase 설정들 ...
+        
+        # 👇 이 세 줄이 정확히 있는지 확인하세요! (앞뒤에 띄어쓰기나 따옴표가 없어야 합니다)
+        HIVEMQ_HOST=763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud
+        HIVEMQ_USERNAME=설정하신_아이디
+        HIVEMQ_PASSWORD=설정하신_비밀번호
+        # ... 기존 Supabase 설정들 ...
+        
+        # 👇 이 세 줄이 정확히 있는지 확인하세요! (앞뒤에 띄어쓰기나 따옴표가 없어야 합니다)
+        HIVEMQ_HOST=763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud
+        HIVEMQ_USERNAME=설정하신_아이디
+        HIVEMQ_PASSWORD=설정하신_비밀번호
+        # ... 기존 Supabase 설정들 ...
+        
+        # 👇 이 세 줄이 정확히 있는지 확인하세요! (앞뒤에 띄어쓰기나 따옴표가 없어야 합니다)
+        HIVEMQ_HOST=763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud
+        HIVEMQ_USERNAME=설정하신_아이디
+        HIVEMQ_PASSWORD=설정하신_비밀번호
+        # ... 기존 Supabase 설정들 ...
+        
+        # 👇 이 세 줄이 정확히 있는지 확인하세요! (앞뒤에 띄어쓰기나 따옴표가 없어야 합니다)
+        HIVEMQ_HOST=763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud
+        HIVEMQ_USERNAME=설정하신_아이디
+        HIVEMQ_PASSWORD=설정하신_비밀번호
+        # ... 기존 Supabase 설정들 ...
+        
+        # 👇 이 세 줄이 정확히 있는지 확인하세요! (앞뒤에 띄어쓰기나 따옴표가 없어야 합니다)
+        HIVEMQ_HOST=763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud
+        HIVEMQ_USERNAME=설정하신_아이디
+        HIVEMQ_PASSWORD=설정하신_비밀번호
+        g: 12px; color: #cbd5e1; font-size: 14px; }
         .image-meta > div { margin: 4px 0; }
         .health-status { 
           margin-top: 8px; 

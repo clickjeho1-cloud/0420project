@@ -3,6 +3,22 @@ git commit -m "update"
 git push  ///
 업로드시 배포시 필수 명령 윈도우에 파워셀에서
 
+
+
+
+\\\\\\\\\\\\\\\
+
+
+# 👇 Supabase 설정 (이 세 줄이 반드시 있어야 합니다!)
+NEXT_PUBLIC_SUPABASE_URL=https://jnmigfpcwjivzwzwcirn.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpubWlnZnBjd2ppdnp3endjaXJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MTI5OTIsImV4cCI6MjA5MjE4ODk5Mn0.yNcD-ndlJNpcqkNBRid7gF-tg81JYvgGijpA-h184zo
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpubWlnZnBjd2ppdnp3endjaXJuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjYxMjk5MiwiZXhwIjoyMDkyMTg4OTkyfQ.JNy-FZHCrf-sFDQ3LpWT2hsSZcBjdE9CHzpQLFJ1ubQ
+
+# 👇 HiveMQ 설정 (현재 아주 완벽하게 설정되어 있습니다!)
+HIVEMQ_HOST=763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud
+HIVEMQ_USERNAME=jhk001
+HIVEMQ_PASSWORD=Sinwonpark1!
+\\\\\\\\\\\\\\\\\\\\\
 git push -f origin main  다음 명령 줄
 
 
@@ -20,7 +36,9 @@ vercel Project Settings → Root Directory 설정
 
 src==.
 
-//
+//대시보드: http://localhost:3001/dashboard
+영농일지: http://localhost:3001/journal
+2. MQTT 백그라운드 스크립트 실행 실패 (
 
 git add .
 git commit -m "fix supabase api key"

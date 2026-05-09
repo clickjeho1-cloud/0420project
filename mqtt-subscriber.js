@@ -50,7 +50,8 @@ const client = mqtt.connect(hivemqOptions);
 client.on('connect', () => {
   console.log('✅ HiveMQ 클라우드에 성공적으로 연결되었습니다.');
   
-  const topic = 'smartfarm/telemetry';
+  // 대시보드 및 아두이노와 동일한 토픽으로 변경
+  const topic = 'smartfarm/jeho123/data';
   client.subscribe(topic, (err) => {
     if (!err) {
       console.log(`📡 토픽 구독 중: ${topic}`);
@@ -71,10 +72,11 @@ client.on('message', async (topic, message) => {
       .insert([
         {
           device_id: payload.device_id || 'smartfarm-zone-1',
-          temperature: payload.temperature,
-          humidity: payload.humidity,
-          ec_value: payload.ec_value,
-          light_intensity: payload.light_intensity,
+          // 아두이노가 보내는 짧은 변수명(temp, hum 등)도 함께 인식하도록 수정
+          temperature: payload.temperature || payload.temp,
+          humidity: payload.humidity || payload.hum,
+          ec_value: payload.ec_value || payload.ec,
+          light_intensity: payload.light_intensity || payload.ppfd,
           red_purple_ratio: payload.red_purple_ratio,
           moisture_status: payload.moisture_status,
           pest_disease_severity: payload.pest_disease_severity,
