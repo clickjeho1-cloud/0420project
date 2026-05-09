@@ -140,12 +140,12 @@ export default function JournalWritePage() {
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    if (files.length > 3) {
-      setImageWarning('사진은 최대 3장까지 업로드할 수 있습니다.');
+    if (files.length > 8) {
+      setImageWarning('사진은 최대 8장까지 업로드할 수 있습니다.');
     } else {
       setImageWarning('');
     }
-    const selected = files.slice(0, 3);
+    const selected = files.slice(0, 8);
     setImages(selected);
     
     // 🔄 각 이미지 분석 시작
@@ -186,7 +186,7 @@ export default function JournalWritePage() {
       await Promise.all(
         files.map(async (file, index) => {
           const timestamp = Date.now();
-          const path = `${STORAGE_PATH_PREFIX}/${timestamp}-${index}-${file.name}`;
+          const path = `${STORAGE_PATH_PREFIX}/plant-${timestamp}-${index}-${file.name}`;
           
           // 📤 파일 업로드
           const { error: uploadError } = await supabase!.storage
@@ -383,7 +383,7 @@ export default function JournalWritePage() {
         </div>
 
         <div className="form-group">
-          <label htmlFor="photos">사진 업로드 (최대 3장)</label>
+          <label htmlFor="photos">사진 업로드 (최대 8장)</label>
           <input
             type="file"
             id="photos"
