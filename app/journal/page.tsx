@@ -400,6 +400,7 @@ export default function JournalWritePage() {
           <div className="image-preview-grid">
             {images.map((file, index) => (
               <div key={file.name + index} className="image-card">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 {imagePreviews[index] && <img src={imagePreviews[index]} alt={`Preview of ${file.name}`} />}
                 <div className="image-meta">
                   <strong>{file.name}</strong>

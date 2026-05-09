@@ -83,6 +83,7 @@ export default function JournalListPage() {
                     {journal.journal_images && journal.journal_images.length > 0 ? (
                       <div className="thumbnail-row">
                         {journal.journal_images.map((img) => (
+                          /* eslint-disable-next-line @next/next/no-img-element */
                           <img key={img.id} src={img.public_url} alt={img.file_name} />
                         ))}
                       </div>
