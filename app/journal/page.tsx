@@ -152,6 +152,7 @@ export default function JournalWritePage() {
       selected.map(async (file) => {
         if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
           try {
+            // @ts-ignore: heic2any 라이브러리는 TypeScript 타입 선언이 없으므로 빌드 에러 방지
             const heic2any = (await import('heic2any')).default;
             const convertedBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 });
             const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;

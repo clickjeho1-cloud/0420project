@@ -138,6 +138,7 @@ export default function JournalListPage() {
         <div className="modal-overlay" onClick={() => setSelectedImage(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="close-btn" onClick={() => setSelectedImage(null)}>✕</button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img 
               src={selectedImage.public_url} 
               alt={selectedImage.file_name} 
