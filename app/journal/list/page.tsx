@@ -39,6 +39,7 @@ const getActionTip = (health?: string) => {
 export default function JournalListPage() {
   const [journals, setJournals] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<JournalImage | null>(null);
 
   useEffect(() => {
     async function fetchJournals() {
@@ -104,6 +105,8 @@ export default function JournalListPage() {
                             <img 
                               src={img.public_url} 
                               alt={img.file_name} 
+                              onClick={() => setSelectedImage(img)}
+                              style={{ cursor: 'pointer' }}
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/0f172a/64748b?text=Format+Error';
                               }}
@@ -130,6 +133,28 @@ export default function JournalListPage() {
         </div>
       )}
 
+      {/* 사진 크게 보기 팝업(모달) */}
+      {selectedImage && (
+        <div className="modal-overlay" onClick={() => setSelectedImage(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="close-btn" onClick={() => setSelectedImage(null)}>✕</button>
+            <img 
+              src={selectedImage.public_url} 
+              alt={selectedImage.file_name} 
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/0f172a/64748b?text=HEIC+Format+Error';
+              }}
+            />
+            <div className="modal-info">
+              <span className={`health-badge health-${selectedImage.crop_health || 'unknown'}`}>
+                {selectedImage.health_description?.split(' ')[0] || '분석 없음'}
+              </span>
+              <span className="image-stats">☀️ 밝기 {selectedImage.avg_brightness}% 🌱 녹색점수 {selectedImage.green_score}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .list-container { background: #05070f; color: white; min-height: 100vh; padding: 24px; font-size: 16px; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f2937; padding-bottom: 16px; margin-bottom: 24px; }
@@ -140,7 +165,7 @@ export default function JournalListPage() {
         
         .loading, .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 18px; }
         
-        .table-wrapper { background: #0b1220; border: 1px solid #1f2937; border-radius: 8px; overflow: hidden; }
+        .table-wrapper { background: #0b1220; border: 1px solid #1f2937; border-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .thumbnail-row { display: flex; gap: 10px; justify-content: flex-start; flex-wrap: wrap; padding: 4px; }
         .image-item { display: flex; flex-direction: column; align-items: center; gap: 5px; background: #0f172a; padding: 8px; border-radius: 8px; border: 1px solid #1e293b; }
         .thumbnail-row img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #334155; }
@@ -158,6 +183,13 @@ export default function JournalListPage() {
         tr:hover td { background: #0f172a; }
         
         .notes-col { text-align: left; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        /* 모달(팝업) 스타일 */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; padding: 20px; box-sizing: border-box; }
+        .modal-content { background: #0f172a; padding: 16px; border-radius: 12px; position: relative; max-width: 100%; display: flex; flex-direction: column; gap: 16px; align-items: center; border: 1px solid #1e293b; }
+        .modal-content img { max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; }
+        .close-btn { position: absolute; top: -12px; right: -12px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 18px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); font-weight: bold; display: flex; align-items: center; justify-content: center; }
+        .modal-info { display: flex; gap: 12px; align-items: center; font-size: 16px; flex-wrap: wrap; justify-content: center; background: #05070f; padding: 8px 16px; border-radius: 8px; border: 1px solid #1f2937; color: #e2e8f0; }
       `}</style>
     </div>
   );
