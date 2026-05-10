@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       longitude: lon,
       current_weather: 'true',
       hourly: 'relativehumidity_2m,cloudcover',
+      daily: 'sunrise,sunset',
       timezone: 'Asia/Seoul',
     });
 
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
 
     const current = meteoData.current_weather;
     const hourly = meteoData.hourly;
+    const daily = meteoData.daily;
     
     let humidity = null;
     let cloudCover = null;
@@ -97,8 +99,10 @@ export async function GET(request: NextRequest) {
         const nx = 62; const ny = 126; // 천호동 좌표
         const kmaUrl = `http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst?serviceKey=${kmaKey}&pageNo=1&numOfRows=10&dataType=JSON&base_date=${base_date}&base_time=${base_time}&nx=${nx}&ny=${ny}`;
         const kmaRes = await fetch(kmaUrl, { cache: 'no-store' });
-        const kmaJson = await kmaRes.json();
-
+        const kmaText = await kmaRes.text();
+        
+        try {
+          const kmaJson = JSON.parse(kmaText);
         if (kmaJson?.response?.header?.resultCode === '00') {
           const items = kmaJson.response.body.items.item;
           kmaData = {};
@@ -110,8 +114,11 @@ export async function GET(request: NextRequest) {
             if (item.category === 'PTY') kmaData.pty = parseInt(item.obsrValue);
           });
         }
+        } catch (parseErr) {
+          console.warn('⚠️ 기상청 응답 파싱 실패 (API 키가 잘못되었을 확률이 매우 높습니다).');
+        }
       } catch (e) {
-        console.error('기상청 API 연동 실패:', e);
+        console.error('기상청 API 네트워크 오류:', e);
       }
     }
 
@@ -145,6 +152,8 @@ export async function GET(request: NextRequest) {
       windDirection: finalVec,
       cloudCover,
       isDay: current?.is_day ?? null,
+      sunrise: daily?.sunrise?.[0] ?? null,
+      sunset: daily?.sunset?.[0] ?? null,
       location: locationName,
       coordinates: { lat: latNum, lon: lonNum },
       dataQuality: { overall: kmaData ? 'high' : 'medium' },

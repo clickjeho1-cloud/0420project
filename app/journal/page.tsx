@@ -146,11 +146,30 @@ export default function JournalWritePage() {
       setImageWarning('');
     }
     const selected = files.slice(0, 8);
-    setImages(selected);
     
+    // 🔄 HEIC (아이폰) 이미지를 일반 웹용(JPG)으로 자동 변환
+    const processedFiles = await Promise.all(
+      selected.map(async (file) => {
+        if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
+          try {
+            const heic2any = (await import('heic2any')).default;
+            const convertedBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 });
+            const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+            return new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+          } catch (err) {
+            console.error('HEIC 변환 실패:', err);
+            return file;
+          }
+        }
+        return file;
+      })
+    );
+
+    setImages(processedFiles);
+
     // 🔄 각 이미지 분석 시작
     try {
-      const analysis = await Promise.all(selected.map((file) => analyzeImage(file)));
+      const analysis = await Promise.all(processedFiles.map((file) => analyzeImage(file)));
       setAnalysisResults(analysis);
     } catch (error) {
       console.error('❌ 이미지 분석 오류:', error);
