@@ -1,12 +1,3 @@
-void setup()
-{
-  // ... 기존 코드 생략 ...
-
-  // 9600을 4800으로 변경하여 테스트
-  RS485Serial.begin(4800, SERIAL_8N1, RS485_RX, RS485_TX); 
-  
-  // ... 기존 코드 생략 ...
-}
 const fs = require('fs');
 const dotenv = require('dotenv');
 
