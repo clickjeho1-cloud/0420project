@@ -10,6 +10,14 @@ npm run dev:all  서버 가동
 
 SFM4cERlRtmTOHBEZdbZEQ
 
+=========================
+
+
+새로 프로젝트 전체를 가져오기: git clone https://github.com/사용자명/저장소명.git
+
+==================
+
+
 
 
 테이블 목록 중에서 journal_images 를 클릭해 보세요.

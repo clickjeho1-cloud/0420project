@@ -1,6 +1,49 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic'; // 항상 최신 데이터를 불러오도록 캐시 강제 비활성화
+
+export async function GET() {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json({ success: false, error: 'Supabase 환경 변수가 설정되지 않았습니다.' }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // journals와 연관된 journal_images(사진)를 함께 불러옵니다.
+    const { data, error } = await supabase
+      .from('journals')
+      .select(`
+        id, date, height, leaf_size, water_amount, notes,
+        journal_images ( id, public_url, file_name, crop_health, health_description, avg_brightness, green_score )
+      `)
+      .order('date', { ascending: false }); // 최신 날짜가 위로 오게 정렬
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    // 프론트엔드에서 사용하는 카멜케이스(camelCase) 변수명으로 자동 매핑
+    const formattedData = data.map((item: any) => ({
+      id: item.id,
+      date: item.date,
+      height: item.height,
+      leafSize: item.leaf_size,
+      waterAmount: item.water_amount,
+      notes: item.notes,
+      journal_images: item.journal_images
+    }));
+
+    return NextResponse.json({ success: true, data: formattedData });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: '서버 내부 오류가 발생했습니다.' }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
