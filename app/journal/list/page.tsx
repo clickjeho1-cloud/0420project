@@ -50,7 +50,7 @@ export default function JournalList() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h2 style={{ margin: 0 }}>📖 영농일지 목록</h2>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <Link href="/journal/write" style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+          <Link href="/journal" style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
             새 일지 작성
           </Link>
           <Link href="/dashboard" style={{ padding: '10px 20px', background: '#475569', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>

@@ -40,6 +40,11 @@ export default function JournalWritePage() {
     leafSize: '',
     waterAmount: '',
     notes: '',
+    ecManagement: '',
+    phSupply: '',
+    drainageRate: '',
+    supplyTime: '',
+    substrateMoisture: '',
   });
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -301,6 +306,11 @@ export default function JournalWritePage() {
         leafSize: formData.leafSize ? parseFloat(formData.leafSize) : null,
         waterAmount: formData.waterAmount ? parseFloat(formData.waterAmount) : null,
         notes: formData.notes,
+        ecManagement: formData.ecManagement,
+        phSupply: formData.phSupply,
+        drainageRate: formData.drainageRate,
+        supplyTime: formData.supplyTime,
+        substrateMoisture: formData.substrateMoisture,
         images: imagesPayload,
       };
       console.log('📤 POST payload:', payload);
@@ -387,6 +397,66 @@ export default function JournalWritePage() {
             onChange={handleChange}
             step="0.1"
             placeholder="예: 2.5"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="ecManagement">EC 관리 (mS/cm)</label>
+          <input
+            type="text"
+            id="ecManagement"
+            name="ecManagement"
+            value={formData.ecManagement}
+            onChange={handleChange}
+            placeholder="예: 2.5"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="phSupply">pH 공급량</label>
+          <input
+            type="text"
+            id="phSupply"
+            name="phSupply"
+            value={formData.phSupply}
+            onChange={handleChange}
+            placeholder="예: 5.8"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="drainageRate">배액률 (%)</label>
+          <input
+            type="text"
+            id="drainageRate"
+            name="drainageRate"
+            value={formData.drainageRate}
+            onChange={handleChange}
+            placeholder="예: 20"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="supplyTime">공급시간</label>
+          <input
+            type="text"
+            id="supplyTime"
+            name="supplyTime"
+            value={formData.supplyTime}
+            onChange={handleChange}
+            placeholder="예: 08:00 ~ 18:00 (총 10회)"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="substrateMoisture">배지 함수율 (%)</label>
+          <input
+            type="text"
+            id="substrateMoisture"
+            name="substrateMoisture"
+            value={formData.substrateMoisture}
+            onChange={handleChange}
+            placeholder="예: 65"
           />
         </div>
 
