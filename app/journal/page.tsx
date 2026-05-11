@@ -1,6 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase 클라이언트 초기화 (환경 변수 필요)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // 이미지 용량 압축 함수 (Request Entity Too Large 에러 방지)
 const compressImage = async (file: File): Promise<File> => {
@@ -51,10 +57,51 @@ const compressImage = async (file: File): Promise<File> => {
   });
 };
 
+// 사진의 밝기, 녹색 비율을 클라이언트에서 즉시 분석하는 함수
+const analyzeImageLocally = (file: File): Promise<{ brightness: number; greenness: number }> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return resolve({ brightness: 0, greenness: 0 });
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        let totalBrightness = 0, totalGreenness = 0;
+        const pixelCount = data.length / 4;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+          totalBrightness += (r + g + b) / 3;
+          const totalRGB = r + g + b;
+          if (totalRGB > 0) totalGreenness += g / totalRGB;
+        }
+
+        resolve({
+          brightness: Math.round((totalBrightness / pixelCount / 255) * 100),
+          greenness: Math.round((totalGreenness / pixelCount) * 100),
+        });
+      };
+      img.onerror = () => resolve({ brightness: 0, greenness: 0 });
+    };
+    reader.onerror = () => resolve({ brightness: 0, greenness: 0 });
+  });
+};
+
 export default function JournalPage() {
   // AI 관련 상태
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [clientAnalysis, setClientAnalysis] = useState<{ brightness: number; greenness: number }[]>([]);
   const [analysisResult, setAnalysisResult] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -85,17 +132,23 @@ export default function JournalPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
       const limitedFiles = files.slice(0, 8); // 최대 8장으로 제한
       setSelectedImages(limitedFiles);
       setImagePreviews(limitedFiles.map(file => URL.createObjectURL(file)));
+
+      // 로컬에서 즉시 밝기/녹색 분석 실행
+      const localAnalyses = await Promise.all(limitedFiles.map(analyzeImageLocally));
+      setClientAnalysis(localAnalyses);
+
       setAnalysisResult('');
       setErrorMessage('');
     } else {
       setSelectedImages([]);
       setImagePreviews([]);
+      setClientAnalysis([]);
     }
   };
 
@@ -108,7 +161,7 @@ export default function JournalPage() {
 
     try {
       const data = new FormData();
-      
+
       // 선택된 모든 이미지를 압축하여 서버 부하 방지
       const compressedFiles = await Promise.all(selectedImages.map(compressImage));
       compressedFiles.forEach(file => data.append('images', file));
@@ -139,11 +192,51 @@ export default function JournalPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('저장될 데이터:', formData);
-    alert('영농일지가 저장되었습니다.');
-    // 차후 여기에 DB 전송 로직 추가
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      alert('Supabase 연결 정보가 설정되지 않았습니다. .env.local 파일을 확인해주세요.');
+      return;
+    }
+
+    try {
+      // Supabase 'journals' 테이블에 데이터 삽입 (테이블명은 실제 환경에 맞게 수정하세요)
+      const { error } = await supabase
+        .from('journals')
+        .insert([
+          {
+            date: formData.date,
+            height: formData.height ? parseFloat(formData.height) : null,
+            leaf_size: formData.leafSize ? parseFloat(formData.leafSize) : null,
+            water_amount: formData.waterAmount ? parseFloat(formData.waterAmount) : null,
+            ec_management: formData.ecManagement,
+            ph_supply: formData.phSupply,
+            drainage_rate: formData.drainageRate,
+            supply_time: formData.supplyTime,
+            substrate_moisture: formData.substrateMoisture,
+            notes: formData.notes,
+          }
+        ]);
+
+      if (error) throw error;
+
+      alert('영농일지가 성공적으로 저장되었습니다!');
+      
+      // 저장 완료 후 다음 작성을 위해 폼과 사진 초기화
+      setFormData({
+        date: getTodayDate(),
+        height: '', leafSize: '', waterAmount: '', ecManagement: '', phSupply: '',
+        drainageRate: '', supplyTime: '', substrateMoisture: '', notes: ''
+      });
+      setSelectedImages([]);
+      setImagePreviews([]);
+      setClientAnalysis([]);
+      setAnalysisResult('');
+    } catch (error: any) {
+      console.error('저장 오류:', error);
+      alert(`저장 중 오류가 발생했습니다: ${error.message}`);
+    }
   };
 
   return (
@@ -209,9 +302,15 @@ export default function JournalPage() {
             {imagePreviews.length > 0 && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '15px' }}>
                 {imagePreviews.map((src, index) => (
-                  <div key={index} style={{ position: 'relative' }}>
+                  <div key={index} style={{ position: 'relative', border: '1px solid #374151', borderRadius: '8px', padding: '5px', background: '#1a1d2d' }}>
                     <div style={{ position: 'absolute', top: '5px', left: '5px', background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>사진 {index + 1}</div>
                     <img src={src} alt={`업로드된 작물 ${index + 1}`} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px' }} />
+                    {clientAnalysis[index] && (
+                      <div style={{ fontSize: '12px', marginTop: '5px', color: '#9ca3af', padding: '5px 0' }}>
+                        <div>💡 밝기: {clientAnalysis[index].brightness}%</div>
+                        <div>🌿 녹색: {clientAnalysis[index].greenness}%</div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -229,7 +328,30 @@ export default function JournalPage() {
 
             {analysisResult && (
               <div className="result-box">
-                <h4 style={{ marginTop: 0, color: '#10b981' }}>📊 AI 종합 진단 리포트</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <h4 style={{ margin: 0, color: '#10b981' }}>📊 AI 종합 진단 리포트</h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        notes: prev.notes ? prev.notes + '\n\n[AI 진단 리포트]\n' + analysisResult : '[AI 진단 리포트]\n' + analysisResult
+                      }));
+                      alert('특이사항 입력란에 내용이 추가되었습니다. 폼의 특이사항을 확인해주세요!');
+                    }}
+                    style={{
+                      padding: '0.4rem 0.8rem',
+                      backgroundColor: '#374151',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    📝 특이사항으로 복사
+                  </button>
+                </div>
                 <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: '#d1d5db' }}>
                   {analysisResult}
                 </div>
