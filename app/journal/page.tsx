@@ -2,6 +2,41 @@
 
 import React, { useState } from 'react';
 
+// 이미지 용량 압축 함수 (Request Entity Too Large 에러 방지)
+const compressImage = async (file: File): Promise<File> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX_WIDTH = 800; // 최대 너비 800px로 리사이징
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (blob) resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          else resolve(file);
+        }, 'image/jpeg', 0.7); // 70% 품질로 압축
+      };
+      img.onerror = () => resolve(file);
+    };
+    reader.onerror = () => resolve(file);
+  });
+};
+
 export default function JournalPage() {
   // AI 관련 상태
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -50,21 +85,30 @@ export default function JournalPage() {
     setAnalysisResult('');
     setErrorMessage('');
 
-    const data = new FormData();
-    selectedImages.forEach(file => data.append('images', file));
-
     try {
+      const data = new FormData();
+      
+      // 선택된 모든 이미지를 압축하여 서버 부하 방지
+      const compressedFiles = await Promise.all(selectedImages.map(compressImage));
+      compressedFiles.forEach(file => data.append('images', file));
+
       const response = await fetch('/api/analyze-crop', {
         method: 'POST',
         body: data,
       });
 
-      const resultData = await response.json();
-
       if (!response.ok) {
-        throw new Error(resultData.error || '서버 통신 중 오류가 발생했습니다.');
+        // JSON 형태의 정상적인 오류 메시지인지 확인 (HTML 에러 페이지 걸러내기)
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          const errData = await response.json();
+          throw new Error(errData.error || '서버 통신 중 오류가 발생했습니다.');
+        } else {
+          throw new Error(`서버 응답 오류(${response.status}): 이미지 용량이 너무 커서 처리가 거부되었을 수 있습니다.`);
+        }
       }
 
+      const resultData = await response.json();
       setAnalysisResult(resultData.analysis);
     } catch (error: any) {
       console.error('분석 오류:', error);
@@ -142,9 +186,12 @@ export default function JournalPage() {
             <input type="file" accept="image/*" multiple onChange={handleImageChange} style={{ marginBottom: '15px' }} />
 
             {imagePreviews.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginBottom: '15px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '15px' }}>
                 {imagePreviews.map((src, index) => (
-                  <img key={index} src={src} alt={`업로드된 작물 ${index + 1}`} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px' }} />
+                  <div key={index} style={{ position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: '5px', left: '5px', background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>사진 {index + 1}</div>
+                    <img src={src} alt={`업로드된 작물 ${index + 1}`} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px' }} />
+                  </div>
                 ))}
               </div>
             )}
