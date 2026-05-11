@@ -1,72 +1,43 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Next.js 캐싱 무효화 (항상 DB에서 최신 데이터를 가져오도록 강제)
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
-// Supabase 클라이언트 초기화 (서버 환경)
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// [1] 영농일지 목록 불러오기 (GET)
-export async function GET() {
-  try {
-    // journals 테이블과 연결된 journal_images 사진 목록까지 한 번에 가져오기
-    const { data, error } = await supabase
-      .from('journals')
-      .select(`
-        *,
-        journal_images (*)
-      `)
-      .order('date', { ascending: false });
-
-    if (error) throw error;
-
-    return NextResponse.json({ success: true, data });
-  } catch (error: any) {
-    console.error('일지 조회 에러:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  }
-}
-
-// [2] 새 영농일지 및 사진 저장하기 (POST)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { date, height, leafSize, waterAmount, notes, images } = body;
 
-    // 💡 빈 글자나 공백이 들어오면 무조건 null로 변환하는 안전 함수
-    const parseNum = (val: any) => {
-      if (val === null || val === undefined || String(val).trim() === '') return null;
-      const num = Number(val);
-      return isNaN(num) ? null : num;
-    };
+    // 환경 변수 로드 (서비스 롤 키를 우선 사용하여 RLS 권한 문제 우회)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    // 1. 영농일지(텍스트 데이터) 저장
-    const { data: journal, error: journalError } = await supabase
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json({ success: false, error: 'Supabase 환경 변수가 설정되지 않았습니다.' }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // 1. journals 테이블에 일지 데이터 우선 저장
+    const { data: journalData, error: journalError } = await supabase
       .from('journals')
-      .insert([
-        {
-          date,
-          // 안전 함수를 사용하여 빈 칸이나 공백은 null로 변환하여 에러 원천 차단
-          height: parseNum(height),
-          "leafSize": parseNum(leafSize),
-          "waterAmount": parseNum(waterAmount),
-          notes: notes || null
-        }
-      ])
+      .insert([{
+        date,
+        height,
+        leaf_size: leafSize,
+        water_amount: waterAmount,
+        notes
+      }])
       .select()
-      .single(); // 방금 저장한 일지의 정보(id 포함)를 가져옴
+      .single();
 
-    if (journalError) throw journalError;
+    if (journalError) {
+      console.error('journals 저장 에러:', journalError);
+      return NextResponse.json({ success: false, error: journalError.message }, { status: 500 });
+    }
 
-    // 2. 업로드된 사진이 있다면 사진 정보도 DB에 저장
+    // 2. 업로드된 이미지가 있다면 새로 생성된 일지 ID와 함께 journal_images 테이블에 저장
     if (images && images.length > 0) {
-      // 방금 저장된 일지의 ID(journal.id)를 사진 정보에 연결(Mapping)
       const imageRecords = images.map((img: any) => ({
-        journal_id: journal.id,
+        journal_id: journalData.id,
         storage_path: img.storage_path,
         public_url: img.public_url,
         file_name: img.file_name,
@@ -79,13 +50,20 @@ export async function POST(request: Request) {
         health_description: img.health_description
       }));
 
-      const { error: imageError } = await supabase.from('journal_images').insert(imageRecords);
-      if (imageError) throw imageError;
+      const { error: imagesError } = await supabase
+        .from('journal_images')
+        .insert(imageRecords);
+
+      if (imagesError) {
+        console.error('journal_images 저장 에러:', imagesError);
+        return NextResponse.json({ success: false, error: '이미지 DB 저장 중 오류: ' + imagesError.message }, { status: 500 });
+      }
     }
 
-    return NextResponse.json({ success: true, data: journal });
+    return NextResponse.json({ success: true, data: journalData });
+
   } catch (error: any) {
-    console.error('일지 저장 에러:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('API 처리 중 에러 발생:', error);
+    return NextResponse.json({ success: false, error: '서버 내부 오류가 발생했습니다.' }, { status: 500 });
   }
 }
