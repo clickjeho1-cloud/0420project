@@ -56,7 +56,7 @@ client.on('connect', () => {
   const topic = 'smartfarm/jeho123/data';
   client.subscribe(topic, (err) => {
     if (!err) {
-      console.log(`📡 토픽 구독 중: `);
+      console.log(`📡 토픽 구독 중: ${topic}`);
     } else {
       console.error('❌ 구독 실패:', err);
     }
@@ -66,7 +66,7 @@ client.on('connect', () => {
 client.on('message', async (topic, message) => {
   try {
     const payload = JSON.parse(message.toString());
-    console.log(`\n📥 [] 수신된 데이터:`, payload);
+    console.log(`\n📥 [${topic}] 수신된 데이터:`, payload);
 
     // Supabase DB 저장 로직
     const { data, error } = await supabase
