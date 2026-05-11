@@ -4,9 +4,23 @@ import React, { useState } from 'react';
 
 // 이미지 용량 압축 함수 (Request Entity Too Large 에러 방지)
 const compressImage = async (file: File): Promise<File> => {
+  let processFile = file;
+
+  // HEIC/HEIF 파일인 경우 JPEG로 자동 변환
+  if (processFile.name.toLowerCase().match(/\.(heic|heif)$/i) || processFile.type === 'image/heic') {
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const convertedBlob = await heic2any({ blob: processFile, toType: 'image/jpeg', quality: 0.8 });
+      const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+      processFile = new File([blob], processFile.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+    } catch (error) {
+      console.error('HEIC 변환 실패:', error);
+    }
+  }
+
   return new Promise((resolve) => {
     const reader = new FileReader();
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(processFile);
     reader.onload = (event) => {
       const img = new Image();
       img.src = event.target?.result as string;
@@ -27,13 +41,13 @@ const compressImage = async (file: File): Promise<File> => {
         ctx?.drawImage(img, 0, 0, width, height);
 
         canvas.toBlob((blob) => {
-          if (blob) resolve(new File([blob], file.name, { type: 'image/jpeg' }));
-          else resolve(file);
+          if (blob) resolve(new File([blob], processFile.name, { type: 'image/jpeg' }));
+          else resolve(processFile);
         }, 'image/jpeg', 0.7); // 70% 품질로 압축
       };
-      img.onerror = () => resolve(file);
+      img.onerror = () => resolve(processFile);
     };
-    reader.onerror = () => resolve(file);
+    reader.onerror = () => resolve(processFile);
   });
 };
 
@@ -45,9 +59,16 @@ export default function JournalPage() {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
+  // 오늘 날짜를 YYYY-MM-DD 형식으로 구하는 함수 (타임존 문제 방지)
+  const getTodayDate = () => {
+    const offset = new Date().getTimezoneOffset() * 60000;
+    const dateOffset = new Date(Date.now() - offset);
+    return dateOffset.toISOString().split('T')[0];
+  };
+
   // 영농일지 폼 데이터 상태
   const [formData, setFormData] = useState({
-    date: '2026-05-11',
+    date: getTodayDate(),
     height: '',
     leafSize: '',
     waterAmount: '',
