@@ -4,7 +4,21 @@ import { createClient } from '@supabase/supabase-js';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { date, height, leafSize, waterAmount, notes, images } = body;
+    const { 
+      date, height, leafSize, waterAmount, notes, images,
+      ecManagement, phSupply, drainageRate, supplyTime, substrateMoisture
+    } = body;
+
+    // 새로 추가된 영농 항목들을 기존 특기사항(notes)에 병합하여 예쁘게 포맷팅합니다.
+    const extendedNotes = `[추가 영농 정보]
+- EC 관리: ${ecManagement || '-'}
+- pH 공급량: ${phSupply || '-'}
+- 배액률: ${drainageRate || '-'}
+- 공급시간: ${supplyTime || '-'}
+- 배지 함수율: ${substrateMoisture || '-'}
+
+[기존 특기사항]
+${notes || ''}`.trim();
 
     // 환경 변수 로드 (서비스 롤 키를 우선 사용하여 RLS 권한 문제 우회)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,7 +38,7 @@ export async function POST(request: Request) {
         height,
         leaf_size: leafSize,
         water_amount: waterAmount,
-        notes
+        notes: extendedNotes
       }])
       .select()
       .single();
