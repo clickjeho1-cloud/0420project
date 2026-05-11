@@ -1,3 +1,12 @@
+void setup()
+{
+  // ... 기존 코드 생략 ...
+
+  // 9600을 4800으로 변경하여 테스트
+  RS485Serial.begin(4800, SERIAL_8N1, RS485_RX, RS485_TX); 
+  
+  // ... 기존 코드 생략 ...
+}
 const fs = require('fs');
 const dotenv = require('dotenv');
 
@@ -35,10 +44,12 @@ if (!supabaseUrl || !supabaseKey) {
 // 3. 클라이언트 초기화
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// 🛠️ 수정됨: 웹소켓(wss) 방식과 8884 포트로 변경
 const hivemqOptions = {
   host: process.env.HIVEMQ_HOST,
-  port: 8883,
-  protocol: 'mqtts',
+  port: 8884,          // 8883 -> 8884로 변경
+  protocol: 'wss',     // 'mqtts' -> 'wss'로 변경
+  path: '/mqtt',       // 웹소켓 경로 추가
   username: process.env.HIVEMQ_USERNAME,
   password: process.env.HIVEMQ_PASSWORD,
   clientId: `smartfarm-server-${Math.random().toString(16).slice(2, 10)}`,
@@ -54,7 +65,7 @@ client.on('connect', () => {
   const topic = 'smartfarm/jeho123/data';
   client.subscribe(topic, (err) => {
     if (!err) {
-      console.log(`📡 토픽 구독 중: ${topic}`);
+      console.log(`📡 토픽 구독 중: `);
     } else {
       console.error('❌ 구독 실패:', err);
     }
@@ -64,7 +75,7 @@ client.on('connect', () => {
 client.on('message', async (topic, message) => {
   try {
     const payload = JSON.parse(message.toString());
-    console.log(`\n📥 [${topic}] 수신된 데이터:`, payload);
+    console.log(`\n📥 [] 수신된 데이터:`, payload);
 
     // Supabase DB 저장 로직
     const { data, error } = await supabase
