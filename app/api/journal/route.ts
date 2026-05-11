@@ -17,10 +17,7 @@ export async function GET() {
     // journals와 연관된 journal_images(사진)를 함께 불러옵니다.
     const { data, error } = await supabase
       .from('journals')
-      .select(`
-        id, date, height, leaf_size, water_amount, notes,
-        journal_images ( id, public_url, file_name, crop_health, health_description, avg_brightness, green_score )
-      `)
+      .select('*, journal_images(*)')
       .order('date', { ascending: false }); // 최신 날짜가 위로 오게 정렬
 
     if (error) {
@@ -32,8 +29,8 @@ export async function GET() {
       id: item.id,
       date: item.date,
       height: item.height,
-      leafSize: item.leaf_size,
-      waterAmount: item.water_amount,
+      leafSize: item.leaf_size || item.leafSize || null,
+      waterAmount: item.water_amount || item.waterAmount || null,
       notes: item.notes,
       journal_images: item.journal_images
     }));
