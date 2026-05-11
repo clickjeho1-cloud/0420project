@@ -16,23 +16,26 @@ export async function POST(req: NextRequest) {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const formData = await req.formData();
-    const imageFile = formData.get('image') as File;
+    const imageFiles = formData.getAll('images') as File[];
 
-    if (!imageFile) {
+    if (!imageFiles || imageFiles.length === 0) {
       return NextResponse.json({ error: '이미지가 업로드되지 않았습니다.' }, { status: 400 });
     }
 
-    const arrayBuffer = await imageFile.arrayBuffer();
-    const base64Image = Buffer.from(arrayBuffer).toString('base64');
-
-    const imageParts = [
-      {
-        inlineData: {
-          data: base64Image,
-          mimeType: imageFile.type,
-        },
-      },
-    ];
+    // 최대 8장까지만 처리
+    const filesToProcess = imageFiles.slice(0, 8);
+    const imageParts = await Promise.all(
+      filesToProcess.map(async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const base64Image = Buffer.from(arrayBuffer).toString('base64');
+        return {
+          inlineData: {
+            data: base64Image,
+            mimeType: file.type,
+          },
+        };
+      })
+    );
 
     const prompt = `
       당신은 스마트팜 농업 전문가이자 식물 병리학자입니다. 

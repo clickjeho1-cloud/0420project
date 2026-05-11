@@ -4,8 +4,8 @@ import React, { useState } from 'react';
 
 export default function JournalPage() {
   // AI 관련 상태
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [analysisResult, setAnalysisResult] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -30,25 +30,28 @@ export default function JournalPage() {
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const file = files[0]; // 첫 번째 이미지를 AI 분석용으로 사용
-      setSelectedImage(file);
-      setImagePreview(URL.createObjectURL(file));
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      const limitedFiles = files.slice(0, 8); // 최대 8장으로 제한
+      setSelectedImages(limitedFiles);
+      setImagePreviews(limitedFiles.map(file => URL.createObjectURL(file)));
       setAnalysisResult('');
       setErrorMessage('');
+    } else {
+      setSelectedImages([]);
+      setImagePreviews([]);
     }
   };
 
   const analyzeImage = async () => {
-    if (!selectedImage) return;
+    if (selectedImages.length === 0) return;
 
     setIsAnalyzing(true);
     setAnalysisResult('');
     setErrorMessage('');
 
     const data = new FormData();
-    data.append('image', selectedImage);
+    selectedImages.forEach(file => data.append('images', file));
 
     try {
       const response = await fetch('/api/analyze-crop', {
@@ -136,15 +139,17 @@ export default function JournalPage() {
               사진을 업로드하면 AI가 작물의 생육 상태와 병해충을 정밀 분석해줍니다.
             </p>
             
-            <input type="file" accept="image/*" onChange={handleImageChange} style={{ marginBottom: '15px' }} />
+            <input type="file" accept="image/*" multiple onChange={handleImageChange} style={{ marginBottom: '15px' }} />
 
-            {imagePreview && (
-              <div style={{ marginBottom: '15px' }}>
-                <img src={imagePreview} alt="업로드된 작물" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }} />
+            {imagePreviews.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '10px', marginBottom: '15px' }}>
+                {imagePreviews.map((src, index) => (
+                  <img key={index} src={src} alt={`업로드된 작물 ${index + 1}`} style={{ width: '100%', height: '100px', objectFit: 'cover', borderRadius: '8px' }} />
+                ))}
               </div>
             )}
 
-            <button type="button" className="btn-ai" onClick={analyzeImage} disabled={!selectedImage || isAnalyzing}>
+            <button type="button" className="btn-ai" onClick={analyzeImage} disabled={selectedImages.length === 0 || isAnalyzing}>
               {isAnalyzing ? 'AI가 정밀 분석 중입니다...' : '업로드한 사진 AI로 진단하기'}
             </button>
 
