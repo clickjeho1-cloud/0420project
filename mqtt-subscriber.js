@@ -78,6 +78,8 @@ client.on('message', async (topic, message) => {
           temperature: payload.temperature || payload.temp,
           humidity: payload.humidity || payload.hum,
           ec_value: payload.ec_value || payload.ec,
+          ph_value: payload.ph_value || payload.ph,
+          nutrient_temp: payload.nutrient_temp || payload.water_temp,
           light_intensity: payload.light_intensity || payload.ppfd,
           red_purple_ratio: payload.red_purple_ratio,
           moisture_status: payload.moisture_status,
