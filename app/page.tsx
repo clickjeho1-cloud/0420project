@@ -1,6 +1,9 @@
-import { redirect } from 'next/navigation';
+import Dashboard from './components/Dashboard';
 
 export default function Home() {
-  // 사이트에 접속하면 자동으로 /dashboard 주소로 보냅니다.
-  redirect('/dashboard');
+  return (
+    <main style={{ minHeight: '100vh', padding: '20px' }}>
+      <Dashboard />
+    </main>
+  );
 }
