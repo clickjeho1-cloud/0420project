@@ -79,102 +79,226 @@ export default function JournalPage() {
   };
 
   return (
-    // 화면 전체 너비를 차지하고 내부 요소를 중앙(flex justify-center)으로 강제 정렬합니다.
-    <div className="min-h-screen w-full flex justify-center p-6 text-gray-200">
-      <div className="w-full max-w-4xl bg-[#11131e] p-8 rounded-2xl shadow-2xl border border-gray-800">
-        <div className="flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
-          <h1 className="text-2xl font-bold">📝 영농일지 작성</h1>
-          <button className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-sm rounded-lg transition-colors">
-            목록으로 돌아가기
-          </button>
+    <div className="container">
+      <div className="form-wrapper">
+        <div className="header">
+          <h1>📝 영농일지 작성</h1>
+          <button type="button" className="btn-back">목록으로 돌아가기</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 기본 영농 폼 영역 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">일자</label>
-              <input type="date" name="date" value={formData.date} onChange={handleInputChange} className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500" required />
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>일자</label>
+              <input type="date" name="date" value={formData.date} onChange={handleInputChange} required />
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">초장 (cm)</label>
-              <input type="number" step="0.1" name="height" value={formData.height} onChange={handleInputChange} placeholder="예: 15.5" className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500" />
+            <div className="form-group">
+              <label>초장 (cm)</label>
+              <input type="number" step="0.1" name="height" value={formData.height} onChange={handleInputChange} placeholder="예: 15.5" />
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">엽면적 (cm²)</label>
-              <input type="number" step="0.1" name="leafSize" value={formData.leafSize} onChange={handleInputChange} placeholder="예: 25.3" className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500" />
+            <div className="form-group">
+              <label>엽면적 (cm²)</label>
+              <input type="number" step="0.1" name="leafSize" value={formData.leafSize} onChange={handleInputChange} placeholder="예: 25.3" />
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">관수량 (L)</label>
-              <input type="number" step="0.1" name="waterAmount" value={formData.waterAmount} onChange={handleInputChange} placeholder="예: 2.5" className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500" />
+            <div className="form-group">
+              <label>관수량 (L)</label>
+              <input type="number" step="0.1" name="waterAmount" value={formData.waterAmount} onChange={handleInputChange} placeholder="예: 2.5" />
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">EC 관리 (mS/cm)</label>
-              <input type="text" name="ecManagement" value={formData.ecManagement} onChange={handleInputChange} placeholder="예: 2.5" className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500" />
+            <div className="form-group">
+              <label>EC 관리 (mS/cm)</label>
+              <input type="text" name="ecManagement" value={formData.ecManagement} onChange={handleInputChange} placeholder="예: 2.5" />
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">pH 공급량</label>
-              <input type="text" name="phSupply" value={formData.phSupply} onChange={handleInputChange} placeholder="예: 5.8" className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500" />
+            <div className="form-group">
+              <label>pH 공급량</label>
+              <input type="text" name="phSupply" value={formData.phSupply} onChange={handleInputChange} placeholder="예: 5.8" />
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">배액률 (%)</label>
-              <input type="text" name="drainageRate" value={formData.drainageRate} onChange={handleInputChange} placeholder="예: 20" className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500" />
+            <div className="form-group">
+              <label>배액률 (%)</label>
+              <input type="text" name="drainageRate" value={formData.drainageRate} onChange={handleInputChange} placeholder="예: 20" />
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">공급시간</label>
-              <input type="text" name="supplyTime" value={formData.supplyTime} onChange={handleInputChange} placeholder="예: 08:00 ~ 18:00 (총 10회)" className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500" />
+            <div className="form-group">
+              <label>공급시간</label>
+              <input type="text" name="supplyTime" value={formData.supplyTime} onChange={handleInputChange} placeholder="예: 08:00 ~ 18:00" />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm text-gray-400 mb-2">배지 함수율 (%)</label>
-              <input type="text" name="substrateMoisture" value={formData.substrateMoisture} onChange={handleInputChange} placeholder="예: 65" className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500" />
+            <div className="form-group full">
+              <label>배지 함수율 (%)</label>
+              <input type="text" name="substrateMoisture" value={formData.substrateMoisture} onChange={handleInputChange} placeholder="예: 65" />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm text-gray-400 mb-2">특이사항</label>
-              <textarea name="notes" rows={3} value={formData.notes} onChange={handleInputChange} placeholder="오늘의 관찰 내용이나 특이사항을 기록하세요." className="w-full bg-[#1a1d2d] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-green-500"></textarea>
+            <div className="form-group full">
+              <label>특이사항</label>
+              <textarea name="notes" rows={3} value={formData.notes} onChange={handleInputChange} placeholder="오늘의 관찰 내용이나 특이사항을 기록하세요."></textarea>
             </div>
           </div>
 
-          {/* 사진 업로드 및 AI 분석 영역 */}
-          <div className="border border-gray-700 rounded-xl p-6 bg-[#151826] mt-8">
-            <label className="block text-lg font-medium text-white mb-2">📸 사진 업로드 및 AI 분석</label>
-            <p className="text-sm text-gray-400 mb-4">사진을 업로드하면 AI가 작물의 생육 상태와 병해충을 정밀 분석해줍니다.</p>
+          <div className="ai-section">
+            <h3 style={{ marginTop: 0, marginBottom: '10px', color: '#fff' }}>📸 사진 업로드 및 AI 분석</h3>
+            <p style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '15px' }}>
+              사진을 업로드하면 AI가 작물의 생육 상태와 병해충을 정밀 분석해줍니다.
+            </p>
             
-            <input type="file" accept="image/*" multiple onChange={handleImageChange} className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-500 transition-colors mb-4" />
+            <input type="file" accept="image/*" onChange={handleImageChange} style={{ marginBottom: '15px' }} />
 
             {imagePreview && (
-              <div className="mb-4">
-                <img src={imagePreview} alt="업로드된 작물" className="max-w-xs rounded-lg shadow-md border border-gray-600" />
+              <div style={{ marginBottom: '15px' }}>
+                <img src={imagePreview} alt="업로드된 작물" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }} />
               </div>
             )}
 
-            <button type="button" onClick={analyzeImage} disabled={!selectedImage || isAnalyzing} className={`px-6 py-2 rounded-lg text-white font-semibold transition-colors ${!selectedImage || isAnalyzing ? 'bg-gray-600 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500'}`}>
+            <button type="button" className="btn-ai" onClick={analyzeImage} disabled={!selectedImage || isAnalyzing}>
               {isAnalyzing ? 'AI가 정밀 분석 중입니다...' : '업로드한 사진 AI로 진단하기'}
             </button>
 
             {errorMessage && (
-              <div className="mt-4 p-4 bg-red-900/40 text-red-200 rounded-lg border border-red-800">
+              <div className="error-box">
                 🚨 {errorMessage}
               </div>
             )}
 
             {analysisResult && (
-              <div className="mt-6 p-6 bg-[#1a1d2d] rounded-lg border border-gray-700">
-                <h2 className="text-xl font-bold mb-4 text-green-400">📊 AI 종합 진단 리포트</h2>
-                <div className="whitespace-pre-wrap leading-relaxed text-gray-300">
+              <div className="result-box">
+                <h4 style={{ marginTop: 0, color: '#10b981' }}>📊 AI 종합 진단 리포트</h4>
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: '#d1d5db' }}>
                   {analysisResult}
                 </div>
               </div>
             )}
           </div>
 
-          {/* 최종 제출 버튼 */}
-          <div className="pt-6">
-            <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-lg text-lg transition-colors shadow-lg">
-              영농일지 최종 저장하기
-            </button>
-          </div>
+          <button type="submit" className="btn-submit">
+            영농일지 최종 저장하기
+          </button>
         </form>
       </div>
+
+      <style jsx>{`
+        .container {
+          display: flex;
+          justify-content: center;
+          padding: 2rem;
+          color: #e5e7eb;
+          font-family: sans-serif;
+        }
+        .form-wrapper {
+          width: 100%;
+          max-width: 900px;
+          background-color: #11131e;
+          padding: 2.5rem;
+          border-radius: 1rem;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+          border: 1px solid #1f2937;
+        }
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 2rem;
+          border-bottom: 1px solid #374151;
+          padding-bottom: 1rem;
+        }
+        .header h1 {
+          margin: 0;
+          font-size: 1.5rem;
+          color: #fff;
+        }
+        .btn-back {
+          background-color: #1f2937;
+          color: #fff;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 0.5rem;
+          cursor: pointer;
+        }
+        .btn-back:hover {
+          background-color: #374151;
+        }
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.5rem;
+        }
+        .form-group {
+          display: flex;
+          flex-direction: column;
+        }
+        .form-group.full {
+          grid-column: span 2;
+        }
+        label {
+          margin-bottom: 0.5rem;
+          font-size: 0.875rem;
+          color: #9ca3af;
+        }
+        input, textarea {
+          background-color: #1a1d2d;
+          border: 1px solid #374151;
+          border-radius: 0.5rem;
+          padding: 0.75rem;
+          color: #fff;
+          outline: none;
+          font-family: inherit;
+        }
+        input:focus, textarea:focus {
+          border-color: #10b981;
+        }
+        .ai-section {
+          margin-top: 2rem;
+          padding: 1.5rem;
+          background-color: #151826;
+          border: 1px solid #374151;
+          border-radius: 0.75rem;
+        }
+        .btn-submit {
+          width: 100%;
+          padding: 1rem;
+          margin-top: 2rem;
+          background-color: #10b981;
+          color: white;
+          font-weight: bold;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          font-size: 1.125rem;
+        }
+        .btn-submit:hover {
+          background-color: #059669;
+        }
+        .btn-ai {
+          padding: 0.75rem 1.5rem;
+          background-color: #2563eb;
+          color: white;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          font-weight: bold;
+        }
+        .btn-ai:disabled {
+          background-color: #4b5563;
+          cursor: not-allowed;
+        }
+        .error-box {
+          margin-top: 1rem;
+          padding: 1rem;
+          background-color: rgba(127, 29, 29, 0.4);
+          color: #fca5a5;
+          border: 1px solid #991b1b;
+          border-radius: 0.5rem;
+        }
+        .result-box {
+          margin-top: 1.5rem;
+          padding: 1.5rem;
+          background-color: #1a1d2d;
+          border: 1px solid #374151;
+          border-radius: 0.5rem;
+        }
+        @media (max-width: 768px) {
+          .form-grid {
+            grid-template-columns: 1fr;
+          }
+          .form-group.full {
+            grid-column: span 1;
+          }
+        }
+      `}</style>
     </div>
   );
 }
