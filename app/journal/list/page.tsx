@@ -1,197 +1,96 @@
-'use client';
+"use client";
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-/* ================= TYPES ================= */
 type JournalImage = {
-  id: number;
+  id: string;
   public_url: string;
   file_name: string;
-  crop_health?: string;
-  health_description?: string;
-  avg_brightness?: number;
-  green_score?: number;
+  crop_health: string;
+  health_description: string;
 };
 
-type JournalEntry = {
-  id: number;
+type Journal = {
+  id: string;
   date: string;
-  height: number | null;
-  leafSize: number | null;
-  waterAmount: number | null;
+  height: string;
+  leafSize: string;
+  waterAmount: string;
   notes: string;
-  journal_images?: JournalImage[];
+  journal_images: JournalImage[];
 };
 
-/* ================= 조치 사항(개선점) 도우미 함수 ================= */
-const getActionTip = (health?: string) => {
-  switch(health) {
-    case 'excellent': return '✨ 현재 환경 유지';
-    case 'good': return '💧 꾸준한 관찰 요망';
-    case 'fair': return '☀️ 광량 및 수분 점검';
-    case 'poor': return '🚨 영양/환경 적극 개선';
-    default: return '🔍 재촬영 요망';
-  }
-};
-
-/* ================= PAGE ================= */
-export default function JournalListPage() {
-  const [journals, setJournals] = useState<JournalEntry[]>([]);
+export default function JournalList() {
+  const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState<JournalImage | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchJournals() {
       try {
-        // 캐시를 무시하고 항상 서버에 최신 데이터를 요청
-        const response = await fetch('/api/journal', { cache: 'no-store' });
-        const result = await response.json();
-        
-        if (result.success) {
-          setJournals(result.data);
+        const res = await fetch('/api/journal');
+        const data = await res.json();
+        if (data.success) {
+          setJournals(data.data);
+        } else {
+          setError(data.error || '데이터를 불러오는데 실패했습니다.');
         }
-      } catch (error) {
-        console.error('일지 목록을 불러오는 중 오류 발생:', error);
+      } catch (err) {
+        setError('서버와 통신 중 오류가 발생했습니다.');
       } finally {
         setLoading(false);
       }
     }
-
     fetchJournals();
   }, []);
 
-  /* ================= UI ================= */
   return (
-    <div className="list-container">
-      <div className="header">
-        <h1>📖 작성된 영농일지 목록</h1>
-        <Link href="/journal" className="write-btn">
-          + 새 일지 작성
-        </Link>
+    <div style={{ padding: '2rem', color: 'white', maxWidth: '1000px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h2 style={{ margin: 0 }}>📖 영농일지 목록</h2>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Link href="/journal/write" style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+            새 일지 작성
+          </Link>
+          <Link href="/dashboard" style={{ padding: '10px 20px', background: '#475569', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+            대시보드로 돌아가기
+          </Link>
+        </div>
       </div>
 
       {loading ? (
-        <p className="loading">데이터를 불러오는 중입니다...</p>
+        <p style={{ textAlign: 'center', color: '#94a3b8' }}>데이터를 불러오는 중입니다...</p>
+      ) : error ? (
+        <p style={{ color: '#ef4444', textAlign: 'center' }}>오류: {error}</p>
       ) : journals.length === 0 ? (
-        <p className="empty">아직 작성된 영농일지가 없습니다.</p>
+        <p style={{ color: '#94a3b8', textAlign: 'center' }}>아직 작성된 영농일지가 없습니다.</p>
       ) : (
-        <div className="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>일자</th>
-                <th>초장 (cm)</th>
-                <th>엽면적 (cm)</th>
-                <th>관수량 (L)</th>
-                <th className="notes-col">특이사항</th>
-                <th>사진</th>
-              </tr>
-            </thead>
-            <tbody>
-              {journals.map((journal) => (
-                <tr key={journal.id}>
-                  <td>{journal.date}</td>
-                  <td>{journal.height || '-'}</td>
-                  <td>{journal.leafSize || '-'}</td>
-                  <td>{journal.waterAmount || '-'}</td>
-                  <td className="notes-col">{journal.notes || '-'}</td>
-                  <td className="images-col">
-                    {journal.journal_images && journal.journal_images.length > 0 ? (
-                      <div className="thumbnail-row">
-                        {journal.journal_images.map((img) => (
-                          <div key={img.id} className="image-item">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img 
-                              src={img.public_url} 
-                              alt={img.file_name} 
-                              onClick={() => setSelectedImage(img)}
-                              style={{ cursor: 'pointer' }}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://placehold.co/80x80/0f172a/64748b?text=Format+Error';
-                              }}
-                            />
-                            {img.health_description && (
-                              <div className={`health-badge health-${img.crop_health || 'unknown'}`}>
-                                {img.health_description.split(' ')[0]}
-                              </div>
-                            )}
-                            {typeof img.avg_brightness === 'number' && (
-                              <div className="image-stats">{getActionTip(img.crop_health)}</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-              <span style={{ color: '#64748b', fontSize: '14px' }}>사진 없음</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {journals.map((journal) => (
+            <div key={journal.id} style={{ background: '#1e293b', padding: '20px', borderRadius: '12px', border: '1px solid #334155' }}>
+              <div style={{ borderBottom: '1px solid #334155', paddingBottom: '10px', marginBottom: '15px' }}>
+                <h3 style={{ margin: 0, color: '#38bdf8' }}>📅 {new Date(journal.date).toLocaleDateString('ko-KR')}</h3>
+              </div>
+              
+              <div style={{ background: '#0f172a', padding: '15px', borderRadius: '8px', whiteSpace: 'pre-wrap', marginBottom: '15px', lineHeight: '1.6' }}>
+                {journal.notes || '특기사항 없음'}
+              </div>
 
-      {/* 사진 크게 보기 팝업(모달) */}
-      {selectedImage && (
-        <div className="modal-overlay" onClick={() => setSelectedImage(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="close-btn" onClick={() => setSelectedImage(null)}>✕</button>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img 
-              src={selectedImage.public_url} 
-              alt={selectedImage.file_name} 
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/0f172a/64748b?text=HEIC+Format+Error';
-              }}
-            />
-            <div className="modal-info">
-              <span className={`health-badge health-${selectedImage.crop_health || 'unknown'}`}>
-                {selectedImage.health_description?.split(' ')[0] || '분석 없음'}
-              </span>
-              <span className="image-stats">☀️ 밝기 {selectedImage.avg_brightness}% 🌱 녹색점수 {selectedImage.green_score}%</span>
+              {journal.journal_images && journal.journal_images.length > 0 && (
+                <div>
+                  <strong style={{ color: '#94a3b8', display: 'block', marginBottom: '10px' }}>첨부된 사진:</strong>
+                  <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                    {journal.journal_images.map((img) => (
+                      <img key={img.id} src={img.public_url} alt={img.file_name} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155' }} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          ))}
         </div>
       )}
-
-      <style jsx>{`
-        .list-container { background: #05070f; color: white; min-height: 100vh; padding: 24px; font-size: 16px; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f2937; padding-bottom: 16px; margin-bottom: 24px; }
-        h1 { margin: 0; font-size: 24px; }
-        
-        .write-btn { background: #2563eb; color: white; padding: 10px 16px; text-decoration: none; border-radius: 4px; font-weight: bold; }
-        .write-btn:hover { background: #1d4ed8; }
-        
-        .loading, .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 18px; }
-        
-        .table-wrapper { background: #0b1220; border: 1px solid #1f2937; border-radius: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .thumbnail-row { display: flex; gap: 10px; justify-content: flex-start; flex-wrap: wrap; padding: 4px; }
-        .image-item { display: flex; flex-direction: column; align-items: center; gap: 5px; background: #0f172a; padding: 8px; border-radius: 8px; border: 1px solid #1e293b; }
-        .thumbnail-row img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #334155; }
-        .health-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-        .health-excellent { background: #10b981; color: #ecfdf5; }
-        .health-good { background: #3b82f6; color: #eff6ff; }
-        .health-fair { background: #f59e0b; color: #fffbeb; }
-        .health-poor { background: #ef4444; color: #fef2f2; }
-        .health-unknown { background: #6b7280; color: #f3f4f6; }
-        .image-stats { font-size: 11px; color: #94a3b8; background: #05070f; padding: 4px 6px; border-radius: 4px; white-space: nowrap; border: 1px solid #1f2937; letter-spacing: -0.5px; }
-        .images-col { min-width: 140px; }
-        table { width: 100%; border-collapse: collapse; text-align: center; }
-        th { background: #1e293b; color: #f8fafc; padding: 14px; font-weight: bold; border-bottom: 2px solid #334155; }
-        td { padding: 14px; border-bottom: 1px solid #1f2937; color: #cbd5e1; }
-        tr:hover td { background: #0f172a; }
-        
-        .notes-col { text-align: left; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        
-        /* 모달(팝업) 스타일 */
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; padding: 20px; box-sizing: border-box; }
-        .modal-content { background: #0f172a; padding: 16px; border-radius: 12px; position: relative; max-width: 100%; display: flex; flex-direction: column; gap: 16px; align-items: center; border: 1px solid #1e293b; }
-        .modal-content img { max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 8px; }
-        .close-btn { position: absolute; top: -12px; right: -12px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 36px; height: 36px; font-size: 18px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.5); font-weight: bold; display: flex; align-items: center; justify-content: center; }
-        .modal-info { display: flex; gap: 12px; align-items: center; font-size: 16px; flex-wrap: wrap; justify-content: center; background: #05070f; padding: 8px 16px; border-radius: 8px; border: 1px solid #1f2937; color: #e2e8f0; }
-      `}</style>
     </div>
   );
 }
