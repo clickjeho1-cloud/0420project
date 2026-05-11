@@ -152,14 +152,24 @@ export default function JournalWritePage() {
     }
     const selected = files.slice(0, 8);
     
-    // 🔄 HEIC (아이폰) 이미지를 일반 웹용(JPG)으로 자동 변환
+    // 🚀 최적화: HEIC 파일이 포함되어 있는지 먼저 확인 후, 라이브러리를 한 번만 로드합니다.
+    const hasHeic = selected.some(file => file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic');
+    let heic2anyLib: any = null;
+    if (hasHeic) {
+      try {
+        heic2anyLib = (await import('heic2any')).default;
+      } catch (err) {
+        console.error('heic2any 라이브러리 로드 실패:', err);
+      }
+    }
+
+    //  HEIC (아이폰) 이미지를 일반 웹용(JPG)으로 자동 변환
     const processedFiles = await Promise.all(
       selected.map(async (file) => {
         if (file.name.toLowerCase().endsWith('.heic') || file.type === 'image/heic') {
           try {
-            // @ts-ignore: heic2any 라이브러리는 TypeScript 타입 선언이 없으므로 빌드 에러 방지
-            const heic2any = (await import('heic2any')).default;
-            const convertedBlob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 });
+            if (!heic2anyLib) return file;
+            const convertedBlob = await heic2anyLib({ blob: file, toType: 'image/jpeg', quality: 0.8 });
             const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
             return new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
           } catch (err) {

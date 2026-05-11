@@ -10,6 +10,7 @@
     "dev:all": "concurrently \"npm run dev\" \"node mqtt-subscriber.js\""
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.43.0",
     "chart.js": "^4.4.2",
     "dotenv": "^16.4.5",
