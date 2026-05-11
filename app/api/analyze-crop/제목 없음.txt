@@ -1,0 +1,443 @@
+/*
+========================================================
+ Glovera Smart Farm
+ ESP32D26 (eletechsup) + Built-in RS485 EC + DHT11 + TLS MQTT
+ originated jhk in 2026
+========================================================
+*/
+
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <DHT.h>
+
+//
+// =====================================================
+// WIFI
+// =====================================================
+//
+const char* ssid     = "daesin_302";
+const char* password = "ds123456";
+
+//
+// =====================================================
+// MQTT TLS
+// =====================================================
+//
+const char* mqtt_server = "763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud";
+const int mqtt_port = 8883;
+
+const char* mqtt_user = "jhk001";
+const char* mqtt_pass = "Sinwonpark1!";
+
+const char* topic_pub = "smartfarm/jeho123/data";
+const char* topic_sub = "smartfarm/jeho123/control"; // 제어 상태 서브스크라이브 토픽
+
+//
+// =====================================================
+// DHT11
+// =====================================================
+//
+#define DHTPIN   4
+#define DHTTYPE  DHT11
+
+DHT dht(DHTPIN, DHTTYPE);
+
+//
+// =====================================================
+// Eletechsup ESP32D26 Built-in RS485 + EC SENSOR
+// RX = 16, TX = 17 (Serial2 기본 핀)
+// 보드의 A+, B- 단자에 센서 직결
+// =====================================================
+//
+HardwareSerial RS485Serial(2);
+
+#define RS485_RX   16
+#define RS485_TX   17
+
+float ecValue = 0.0;
+
+//
+// =====================================================
+// 74HC595 RELAY
+// =====================================================
+//
+#define RELAY_DATA   14
+#define RELAY_LATCH  12
+#define RELAY_CLOCK  13
+
+byte relayState = 0b00000000;
+
+//
+// =====================================================
+// RELAY INDEX
+// =====================================================
+//
+#define RELAY1_FAN       0
+#define RELAY2_PUMP      1
+#define RELAY3_LED       2
+#define RELAY4_HEATER    3
+
+//
+// =====================================================
+// DEVICE STATE
+// =====================================================
+//
+bool fanState    = false;
+bool pumpState   = false;
+bool ledState    = false;
+bool heaterState = false;
+
+//
+// =====================================================
+// PUMP TIMER
+// =====================================================
+//
+bool pumpRunning = false;
+unsigned long pumpStart    = 0;
+unsigned long pumpDuration = 0;
+
+//
+// =====================================================
+// MQTT
+// =====================================================
+//
+WiFiClientSecure espClient;
+PubSubClient client(espClient);
+
+//
+// =====================================================
+// RELAY UPDATE
+// =====================================================
+//
+void updateRelay()
+{
+  digitalWrite(RELAY_LATCH, LOW);
+  shiftOut(RELAY_DATA, RELAY_CLOCK, MSBFIRST, relayState);
+  digitalWrite(RELAY_LATCH, HIGH);
+}
+
+//
+// =====================================================
+// RELAY CONTROL
+// =====================================================
+//
+void setRelay(int relay, bool on)
+{
+  if (on)
+    bitSet(relayState, relay);
+  else
+    bitClear(relayState, relay);
+
+  updateRelay();
+}
+
+//
+// =====================================================
+// CRC16 MODBUS
+// =====================================================
+//
+uint16_t calcCRC(byte* buf, int len)
+{
+  uint16_t crc = 0xFFFF;
+  for (int i = 0; i < len; i++)
+  {
+    crc ^= buf[i];
+    for (int j = 0; j < 8; j++)
+    {
+      if (crc & 1)
+        crc = (crc >> 1) ^ 0xA001;
+      else
+        crc >>= 1;
+    }
+  }
+  return crc;
+}
+
+//
+// =====================================================
+// READ EC SENSOR (MODBUS RTU) - 기존 원본 로직 유지
+// =====================================================
+//
+float readEC()
+{
+  byte request[8];
+  request[0] = 0x01; // 센서 주소
+  request[1] = 0x03; // 함수코드
+  request[2] = 0x00; // 레지스터 상위
+  request[3] = 0x00; // 레지스터 하위
+  request[4] = 0x00; // 길이 상위
+  request[5] = 0x01; // 길이 하위
+
+  uint16_t crc = calcCRC(request, 6);
+  request[6] = crc & 0xFF;
+  request[7] = (crc >> 8) & 0xFF;
+
+  while (RS485Serial.available())
+    RS485Serial.read();
+
+  RS485Serial.write(request, 8);
+  RS485Serial.flush();
+
+  delay(300);
+
+  byte response[7];
+  int index = 0;
+
+  while (RS485Serial.available())
+  {
+    response[index++] = RS485Serial.read();
+    if (index >= 7)
+      break;
+  }
+
+  Serial.print("EC RAW : ");
+  for (int i = 0; i < index; i++)
+  {
+    Serial.print(response[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+
+  if (index >= 7)
+  {
+    int value = (response[3] << 8) | response[4];
+    float ec = value / 100.0;
+    return ec;
+  }
+
+  return ecValue; // 고장 및 미응답 시 이전 값 유지
+}
+
+//
+// =====================================================
+// DEVICE CONTROL
+// =====================================================
+//
+void handleDevices(JsonObject devices)
+{
+  if (devices.containsKey("fan"))
+  {
+    bool on = devices["fan"]["on"] | false;
+    setRelay(RELAY1_FAN, on);
+    fanState = on;
+  }
+
+  if (devices.containsKey("pump"))
+  {
+    bool on = devices["pump"]["on"] | false;
+    int duration = devices["pump"]["duration_sec"] | 0;
+
+    if (on)
+    {
+      setRelay(RELAY2_PUMP, true);
+      pumpState = true;
+
+      if (duration > 0)
+      {
+        pumpRunning  = true;
+        pumpStart    = millis();
+        pumpDuration = duration * 1000UL;
+      }
+    }
+    else
+    {
+      setRelay(RELAY2_PUMP, false);
+      pumpState   = false;
+      pumpRunning = false;
+    }
+  }
+
+  if (devices.containsKey("led"))
+  {
+    bool on = devices["led"]["on"] | false;
+    setRelay(RELAY3_LED, on);
+    ledState = on;
+  }
+
+  if (devices.containsKey("heater"))
+  {
+    bool on = devices["heater"]["on"] | false;
+    setRelay(RELAY4_HEATER, on);
+    heaterState = on;
+  }
+}
+
+//
+// =====================================================
+// MQTT CALLBACK
+// =====================================================
+//
+void callback(char* topic, byte* payload, unsigned int length)
+{
+  StaticJsonDocument<512> doc;
+  DeserializationError err = deserializeJson(doc, payload, length);
+
+  if (err)
+  {
+    Serial.println("JSON ERROR");
+    return;
+  }
+
+  const char* cmd = doc["cmd_type"];
+  if (cmd && strcmp(cmd, "manual") == 0)
+  {
+    JsonObject devices = doc["devices"];
+    handleDevices(devices);
+    Serial.println("COMMAND APPLIED");
+  }
+}
+
+//
+// =====================================================
+// MQTT RECONNECT (Non-blocking 방식)
+// =====================================================
+//
+void reconnect()
+{
+  Serial.print("MQTT CONNECTING...");
+  if (client.connect("esp32_client", mqtt_user, mqtt_pass))
+  {
+    Serial.println("OK");
+    client.subscribe(topic_sub);
+  }
+  else
+  {
+    Serial.print("FAILED : ");
+    Serial.println(client.state());
+  }
+}
+
+//
+// =====================================================
+// SETUP
+// =====================================================
+//
+void setup()
+{
+  Serial.begin(9600);
+
+  pinMode(RELAY_DATA,  OUTPUT);
+  pinMode(RELAY_LATCH, OUTPUT);
+  pinMode(RELAY_CLOCK, OUTPUT);
+  updateRelay();
+
+  // ESP32D26 보드의 내장 RS485 핀(16, 17)으로 하드웨어 시리얼 초기화
+  RS485Serial.begin(9600, SERIAL_8N1, RS485_RX, RS485_TX);
+  dht.begin();
+
+  WiFi.begin(ssid, password);
+
+  Serial.print("WIFI CONNECTING");
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+  Serial.println("WIFI CONNECTED");
+  Serial.print("IP : ");
+  Serial.println(WiFi.localIP());
+
+  espClient.setInsecure();
+  client.setServer(mqtt_server, mqtt_port);
+  client.setCallback(callback);
+}
+
+//
+// =====================================================
+// LOOP
+// =====================================================
+//
+void loop()
+{
+  // 1. MQTT 재접속 (Non-blocking)
+  static unsigned long lastReconnectAttempt = 0;
+  if (!client.connected())
+  {
+    if (millis() - lastReconnectAttempt > 5000)
+    {
+      lastReconnectAttempt = millis();
+      reconnect();
+    }
+  }
+  else
+  {
+    client.loop();
+  }
+
+  // 2. PUMP 자동 종료
+  if (pumpRunning && millis() - pumpStart > pumpDuration)
+  {
+    setRelay(RELAY2_PUMP, false);
+    pumpRunning = false;
+    pumpState   = false;
+  }
+
+  // 3. 2초마다 데이터 읽기 및 MQTT 전송
+  static unsigned long lastTime = 0;
+  if (millis() - lastTime > 2000)
+  {
+    lastTime = millis();
+
+    // ===================================================
+    // EC 센서 읽기 (고장 시 이전 값 또는 0.0 유지)
+    // ===================================================
+    ecValue = readEC();
+
+    // ===================================================
+    // DHT 센서 읽기
+    // ===================================================
+    float temp = dht.readTemperature();
+    float hum  = dht.readHumidity();
+
+    // 값을 보존하기 위한 정적 변수
+    static float lastTemp = 0.0;
+    static float lastHum  = 0.0;
+
+    // 에러 발생 시 return 하지 않고 이전 정상 값을 사용하여 통신을 유지
+    if (isnan(temp) || isnan(hum))
+    {
+      Serial.println("DHT ERROR (통신 유지를 위해 이전 값 전송)");
+      temp = lastTemp;
+      hum  = lastHum;
+    }
+    else
+    {
+      lastTemp = temp;
+      lastHum  = hum;
+    }
+
+    // ===================================================
+    // JSON 데이터 생성
+    // ===================================================
+    StaticJsonDocument<512> doc;
+
+    doc["temperature"] = temp;
+    doc["humidity"]    = hum;
+    doc["ec"]          = ecValue;  // 센서 고장이면 0.0 또는 이전값이 들어감
+    doc["fan"]         = fanState;
+    doc["pump"]        = pumpState;
+    doc["led"]         = ledState;
+    doc["heater"]      = heaterState;
+
+    char buffer[512];
+    serializeJson(doc, buffer);
+
+    // ===================================================
+    // MQTT SEND
+    // ===================================================
+    if (client.connected())
+    {
+      client.publish(topic_pub, buffer);
+    }
+
+    // ===================================================
+    // SERIAL 디버그 출력
+    // ===================================================
+    Serial.println("======================");
+    Serial.println(buffer);
+  }
+}
