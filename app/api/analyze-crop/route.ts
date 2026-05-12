@@ -4,6 +4,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export async function POST(req: NextRequest) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
+    
+    // 서버 터미널에서 API 키가 정상적으로 로드되었는지 확인하는 로그
+    console.log("[API 진단] GEMINI_API_KEY 로드 상태:", apiKey ? `✅ 성공 (길이: ${apiKey.length}자)` : "❌ 실패(찾을 수 없음)");
+
     if (!apiKey) {
       console.error('환경 변수에 GEMINI_API_KEY가 설정되지 않았습니다.');
       return NextResponse.json(

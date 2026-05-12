@@ -200,7 +200,35 @@ export default function JournalPage() {
     }
 
     try {
-      // Supabase 'journals' 테이블에 데이터 삽입 (테이블명은 실제 환경에 맞게 수정하세요)
+      // 1. Supabase Storage 'journal-images' 버킷에 사진 업로드
+      let uploadedUrls: string[] = [];
+      if (selectedImages.length > 0) {
+        alert('사진을 업로드하고 영농일지를 저장하는 중입니다. 잠시만 기다려주세요...');
+        for (let i = 0; i < selectedImages.length; i++) {
+          const file = selectedImages[i];
+          const fileExt = file.name.split('.').pop() || 'jpg';
+          const fileName = `${Date.now()}-${i}.${fileExt}`;
+
+          // journal-images 버킷에 업로드
+          const { data, error: uploadError } = await supabase.storage
+            .from('journal-images')
+            .upload(fileName, file);
+
+          if (uploadError) {
+            console.error('이미지 업로드 에러:', uploadError);
+            throw new Error(`이미지 업로드 실패: ${uploadError.message}`);
+          }
+
+          // 업로드된 이미지의 공개 URL 가져오기
+          const { data: publicUrlData } = supabase.storage
+            .from('journal-images')
+            .getPublicUrl(fileName);
+
+          uploadedUrls.push(publicUrlData.publicUrl);
+        }
+      }
+
+      // 2. Supabase 'journals' 테이블에 최종 데이터 삽입
       const { error } = await supabase
         .from('journals')
         .insert([
@@ -215,6 +243,7 @@ export default function JournalPage() {
             supply_time: formData.supplyTime,
             substrate_moisture: formData.substrateMoisture ? parseFloat(formData.substrateMoisture) : null,
             notes: formData.notes,
+            photos: uploadedUrls.join(','), // 💡 업로드된 사진 URL들을 쉼표로 묶어서 저장
           }
         ]);
 
