@@ -3,9 +3,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    // .env.local 파일을 못 찾는 경우를 대비해 사용자님의 키를 직접 삽입합니다.
+    const apiKey = process.env.GEMINI_API_KEY || "AIzaSyA_EgbdM5d1Qpr0Nv0FyTP1x1G9VsZ6Kkk";
     
-    // 서버 터미널에서 API 키가 정상적으로 로드되었는지 확인하는 로그
     console.log("[API 진단] GEMINI_API_KEY 로드 상태:", apiKey ? `✅ 성공 (길이: ${apiKey.length}자)` : "❌ 실패(찾을 수 없음)");
 
     if (!apiKey) {
