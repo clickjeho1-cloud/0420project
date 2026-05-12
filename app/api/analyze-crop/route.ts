@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    // 💡 호환성이 가장 좋은 비전(이미지) 모델로 변경합니다.
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
+    // 💡 최신 표준 이미지 분석 모델인 1.5-flash로 변경합니다.
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const formData = await req.formData();
     const imageFiles = formData.getAll('images') as File[];
