@@ -102,6 +102,9 @@ export default function JournalPage() {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [clientAnalysis, setClientAnalysis] = useState<{ brightness: number; greenness: number }[]>([]);
+  const [analysisResult, setAnalysisResult] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   // 오늘 날짜를 YYYY-MM-DD 형식으로 구하는 함수 (타임존 문제 방지)
   const getTodayDate = () => {
@@ -139,11 +142,52 @@ export default function JournalPage() {
       // 로컬에서 즉시 밝기/녹색 분석 실행
       const localAnalyses = await Promise.all(limitedFiles.map(analyzeImageLocally));
       setClientAnalysis(localAnalyses);
-
+      setAnalysisResult('');
+      setErrorMessage('');
     } else {
       setSelectedImages([]);
       setImagePreviews([]);
       setClientAnalysis([]);
+    }
+  };
+
+  const analyzeImage = async () => {
+    if (selectedImages.length === 0) return;
+
+    setIsAnalyzing(true);
+    setAnalysisResult('');
+    setErrorMessage('');
+
+    try {
+      const data = new FormData();
+
+      // 선택된 모든 이미지를 압축하여 서버 부하 방지
+      const compressedFiles = await Promise.all(selectedImages.map(compressImage));
+      compressedFiles.forEach(file => data.append('images', file));
+
+      const response = await fetch('/api/analyze-crop', {
+        method: 'POST',
+        body: data,
+      });
+
+      if (!response.ok) {
+        // JSON 형태의 정상적인 오류 메시지인지 확인 (HTML 에러 페이지 걸러내기)
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          const errData = await response.json();
+          throw new Error(errData.error || '서버 통신 중 오류가 발생했습니다.');
+        } else {
+          throw new Error(`서버 응답 오류(${response.status}): 이미지 용량이 너무 커서 처리가 거부되었을 수 있습니다.`);
+        }
+      }
+
+      const resultData = await response.json();
+      setAnalysisResult(resultData.analysis);
+    } catch (error: any) {
+      console.error('분석 오류:', error);
+      setErrorMessage(error.message);
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -187,6 +231,7 @@ export default function JournalPage() {
       setSelectedImages([]);
       setImagePreviews([]);
       setClientAnalysis([]);
+      setAnalysisResult('');
     } catch (error: any) {
       console.error('저장 오류:', error);
       alert(`저장 중 오류가 발생했습니다: ${error.message}`);
@@ -246,7 +291,10 @@ export default function JournalPage() {
           </div>
 
           <div className="ai-section">
-            <h3 style={{ marginTop: 0, marginBottom: '10px', color: '#fff' }}>📸 사진 첨부 및 로컬 분석</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '10px', color: '#fff' }}>📸 사진 업로드 및 AI 분석</h3>
+            <p style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '15px' }}>
+              사진을 업로드하면 AI가 작물의 생육 상태와 병해충을 정밀 분석해줍니다.
+            </p>
             
             <input type="file" accept="image/*" multiple onChange={handleImageChange} style={{ marginBottom: '15px' }} />
 
@@ -264,6 +312,48 @@ export default function JournalPage() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+
+            <button type="button" className="btn-ai" onClick={analyzeImage} disabled={selectedImages.length === 0 || isAnalyzing}>
+              {isAnalyzing ? 'AI가 정밀 분석 중입니다...' : '업로드한 사진 AI로 진단하기'}
+            </button>
+
+            {errorMessage && (
+              <div className="error-box">
+                🚨 {errorMessage}
+              </div>
+            )}
+
+            {analysisResult && (
+              <div className="result-box">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <h4 style={{ margin: 0, color: '#10b981' }}>📊 AI 종합 진단 리포트</h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        notes: prev.notes ? prev.notes + '\n\n[AI 진단 리포트]\n' + analysisResult : '[AI 진단 리포트]\n' + analysisResult
+                      }));
+                      alert('특이사항 입력란에 내용이 추가되었습니다. 폼의 특이사항을 확인해주세요!');
+                    }}
+                    style={{
+                      padding: '0.4rem 0.8rem',
+                      backgroundColor: '#374151',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '0.375rem',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    📝 특이사항으로 복사
+                  </button>
+                </div>
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: '#d1d5db' }}>
+                  {analysisResult}
+                </div>
               </div>
             )}
           </div>
@@ -365,6 +455,34 @@ export default function JournalPage() {
         }
         .btn-submit:hover {
           background-color: #059669;
+        }
+        .btn-ai {
+          padding: 0.75rem 1.5rem;
+          background-color: #2563eb;
+          color: white;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          font-weight: bold;
+        }
+        .btn-ai:disabled {
+          background-color: #4b5563;
+          cursor: not-allowed;
+        }
+        .error-box {
+          margin-top: 1rem;
+          padding: 1rem;
+          background-color: rgba(127, 29, 29, 0.4);
+          color: #fca5a5;
+          border: 1px solid #991b1b;
+          border-radius: 0.5rem;
+        }
+        .result-box {
+          margin-top: 1.5rem;
+          padding: 1.5rem;
+          background-color: #1a1d2d;
+          border: 1px solid #374151;
+          border-radius: 0.5rem;
         }
         @media (max-width: 768px) {
           .form-grid {
