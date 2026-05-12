@@ -26,6 +26,7 @@ export default function JournalList() {
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchJournals() {
@@ -85,17 +86,43 @@ export default function JournalList() {
                   <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                   {/* 새 방식: photos 문자열에서 쉼표로 분리하여 렌더링 */}
                   {journal.photos && journal.photos.split(',').filter(url => url.trim() !== '').map((url, idx) => (
-                    <img key={`photo-${idx}`} src={url.trim()} alt={`첨부 사진 ${idx + 1}`} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155' }} />
+                    <img key={`photo-${idx}`} src={url.trim()} alt={`첨부 사진 ${idx + 1}`} onClick={() => setSelectedImage(url.trim())} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
                   ))}
                   {/* 구 방식 호환: 예전 데이터가 있을 경우 렌더링 */}
                   {(!journal.photos && journal.journal_images) && journal.journal_images.map((img) => (
-                      <img key={img.id} src={img.public_url} alt={img.file_name} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155' }} />
+                      <img key={img.id} src={img.public_url} alt={img.file_name} onClick={() => setSelectedImage(img.public_url)} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
                     ))}
                   </div>
                 </div>
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 이미지 확대 팝업(모달) */}
+      {selectedImage && (
+        <div
+          onClick={() => setSelectedImage(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+            cursor: 'zoom-out'
+          }}
+        >
+          <img
+            src={selectedImage}
+            alt="확대된 사진"
+            style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.8)' }}
+          />
         </div>
       )}
     </div>
