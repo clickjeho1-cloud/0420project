@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         return {
           inlineData: {
             data: base64Image,
-            mimeType: file.type,
+            mimeType: file.type || 'image/jpeg', // 이미지 타입 누락 시 기본값 지정
           },
         };
       })
@@ -62,8 +62,9 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('이미지 분석 중 오류 발생:', error);
+    const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
     return NextResponse.json(
-      { error: '이미지 분석에 실패했습니다. 이미지 파일이나 서버 상태를 확인해주세요.' }, 
+      { error: `이미지 분석 실패 (원인: ${errorMessage})` }, 
       { status: 500 }
     );
   }
