@@ -205,14 +205,15 @@ export default function JournalPage() {
       if (selectedImages.length > 0) {
         alert('사진을 업로드하고 영농일지를 저장하는 중입니다. 잠시만 기다려주세요...');
         for (let i = 0; i < selectedImages.length; i++) {
-          const file = selectedImages[i];
+          // 💡 원본 사진 용량이 커서 업로드(저장)에 실패하는 현상 방지를 위해 압축 후 전송
+          const file = await compressImage(selectedImages[i]);
           const fileExt = file.name.split('.').pop() || 'jpg';
           const fileName = `${Date.now()}-${i}.${fileExt}`;
 
           // journal-images 버킷에 업로드
           const { data, error: uploadError } = await supabase.storage
             .from('journal-images')
-            .upload(fileName, file);
+            .upload(fileName, file, { upsert: true });
 
           if (uploadError) {
             console.error('이미지 업로드 에러:', uploadError);
