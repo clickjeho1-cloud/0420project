@@ -18,7 +18,8 @@ type Journal = {
   leafSize: string;
   waterAmount: string;
   notes: string;
-  journal_images: JournalImage[];
+  photos?: string; // 💡 새로 저장된 쉼표 형태의 사진 URL 문자열
+  journal_images?: JournalImage[]; // 기존 방식 호환을 위해 옵셔널 처리
 };
 
 export default function JournalList() {
@@ -50,10 +51,10 @@ export default function JournalList() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h2 style={{ margin: 0 }}>📖 영농일지 목록</h2>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <Link href="/journal" style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+          <Link href="/journal" style={{ padding: '10px 20px', background: '#10b981', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
             새 일지 작성
           </Link>
-          <Link href="/dashboard" style={{ padding: '10px 20px', background: '#475569', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+          <Link href="/dashboard" style={{ padding: '10px 20px', background: '#f59e0b', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
             대시보드로 돌아가기
           </Link>
         </div>
@@ -77,11 +78,16 @@ export default function JournalList() {
                 {journal.notes || '특기사항 없음'}
               </div>
 
-              {journal.journal_images && journal.journal_images.length > 0 && (
+            {(journal.photos || (journal.journal_images && journal.journal_images.length > 0)) && (
                 <div>
                   <strong style={{ color: '#94a3b8', display: 'block', marginBottom: '10px' }}>첨부된 사진:</strong>
                   <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                    {journal.journal_images.map((img) => (
+                  {/* 새 방식: photos 문자열에서 쉼표로 분리하여 렌더링 */}
+                  {journal.photos && journal.photos.split(',').filter(url => url.trim() !== '').map((url, idx) => (
+                    <img key={`photo-${idx}`} src={url.trim()} alt={`첨부 사진 ${idx + 1}`} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155' }} />
+                  ))}
+                  {/* 구 방식 호환: 예전 데이터가 있을 경우 렌더링 */}
+                  {(!journal.photos && journal.journal_images) && journal.journal_images.map((img) => (
                       <img key={img.id} src={img.public_url} alt={img.file_name} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155' }} />
                     ))}
                   </div>

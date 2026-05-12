@@ -425,15 +425,17 @@ export default function JournalPage() {
           color: #fff;
         }
         .btn-back {
-          background-color: #1f2937;
+          background-color: #f59e0b;
           color: #fff;
           border: none;
           padding: 0.5rem 1rem;
           border-radius: 0.5rem;
           cursor: pointer;
+          font-weight: bold;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .btn-back:hover {
-          background-color: #374151;
+          background-color: #d97706;
         }
         .form-grid {
           display: grid;
