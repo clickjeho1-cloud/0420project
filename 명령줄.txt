@@ -11,7 +11,10 @@ npm run dev:all  서버 가동
 SFM4cERlRtmTOHBEZdbZEQ
 
 =========================
+ [Gemini AI 설정]
+GEMINI_API_KEY=AIzaSyA_EgbdM5d1Qpr0Nv0FyTP1x1G9VsZ6Kkk
 
+=================================
 
 새로 프로젝트 전체를 가져오기: git clone https://github.com/사용자명/저장소명.git
 

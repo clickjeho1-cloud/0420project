@@ -210,11 +210,11 @@ export default function JournalPage() {
             height: formData.height ? parseFloat(formData.height) : null,
             leaf_size: formData.leafSize ? parseFloat(formData.leafSize) : null,
             water_amount: formData.waterAmount ? parseFloat(formData.waterAmount) : null,
-            ec_management: formData.ecManagement,
-            ph_supply: formData.phSupply,
-            drainage_rate: formData.drainageRate,
+            ec_management: formData.ecManagement ? parseFloat(formData.ecManagement) : null,
+            ph_supply: formData.phSupply ? parseFloat(formData.phSupply) : null,
+            drainage_rate: formData.drainageRate ? parseFloat(formData.drainageRate) : null,
             supply_time: formData.supplyTime,
-            substrate_moisture: formData.substrateMoisture,
+            substrate_moisture: formData.substrateMoisture ? parseFloat(formData.substrateMoisture) : null,
             notes: formData.notes,
           }
         ]);
@@ -267,15 +267,15 @@ export default function JournalPage() {
             </div>
             <div className="form-group">
               <label>EC 관리 (mS/cm)</label>
-              <input type="text" name="ecManagement" value={formData.ecManagement} onChange={handleInputChange} placeholder="예: 2.5" />
+              <input type="number" step="0.1" name="ecManagement" value={formData.ecManagement} onChange={handleInputChange} placeholder="예: 2.5" />
             </div>
             <div className="form-group">
               <label>pH 공급량</label>
-              <input type="text" name="phSupply" value={formData.phSupply} onChange={handleInputChange} placeholder="예: 5.8" />
+              <input type="number" step="0.1" name="phSupply" value={formData.phSupply} onChange={handleInputChange} placeholder="예: 5.8" />
             </div>
             <div className="form-group">
               <label>배액률 (%)</label>
-              <input type="text" name="drainageRate" value={formData.drainageRate} onChange={handleInputChange} placeholder="예: 20" />
+              <input type="number" step="0.1" name="drainageRate" value={formData.drainageRate} onChange={handleInputChange} placeholder="예: 20" />
             </div>
             <div className="form-group">
               <label>공급시간</label>
@@ -283,7 +283,7 @@ export default function JournalPage() {
             </div>
             <div className="form-group full">
               <label>배지 함수율 (%)</label>
-              <input type="text" name="substrateMoisture" value={formData.substrateMoisture} onChange={handleInputChange} placeholder="예: 65" />
+              <input type="number" step="0.1" name="substrateMoisture" value={formData.substrateMoisture} onChange={handleInputChange} placeholder="예: 65" />
             </div>
             <div className="form-group full">
               <label>특이사항</label>
