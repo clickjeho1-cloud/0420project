@@ -34,7 +34,7 @@ const compressImage = async (file: File): Promise<File> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_WIDTH = 800; // 최대 너비 800px로 리사이징
+        const MAX_WIDTH = 512; // 💡 허깅페이스 용량 초과 에러 방지를 위해 512px로 더욱 압축
 
         if (width > MAX_WIDTH) {
           height = Math.round((height * MAX_WIDTH) / width);
@@ -49,7 +49,7 @@ const compressImage = async (file: File): Promise<File> => {
         canvas.toBlob((blob) => {
           if (blob) resolve(new File([blob], processFile.name, { type: 'image/jpeg' }));
           else resolve(processFile);
-        }, 'image/jpeg', 0.7); // 70% 품질로 압축
+        }, 'image/jpeg', 0.6); // 💡 60% 품질로 압축 (용량 최소화)
       };
       img.onerror = () => resolve(processFile);
     };
@@ -161,8 +161,9 @@ export default function JournalPage() {
     try {
       const data = new FormData();
 
-      // 선택된 모든 이미지를 압축하여 서버 부하 방지
-      const compressedFiles = await Promise.all(selectedImages.map(compressImage));
+      // 💡 허깅페이스 서버 용량 초과(Payload Too Large) 에러를 막기 위해 분석에는 최대 2장만 전송
+      const imagesForAI = selectedImages.slice(0, 2);
+      const compressedFiles = await Promise.all(imagesForAI.map(img => compressImage(img)));
       compressedFiles.forEach(file => data.append('images', file));
 
       // 💡 AI가 분석 시 참고할 수 있도록 현재 폼에 입력된 수치 데이터를 함께 전송
