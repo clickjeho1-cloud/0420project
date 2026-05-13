@@ -16,6 +16,12 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     
+    // 💡 프론트엔드에서 보낸 폼 데이터를 변수로 읽어옵니다 (이 부분이 추가되어야 에러가 안 납니다!)
+    const height = formData.get('height') || '미입력';
+    const water = formData.get('water') || '미입력';
+    const ec = formData.get('ec') || '미입력';
+    const ph = formData.get('ph') || '미입력';
+
     // 💡 프론트엔드에서 여러 장의 사진(images)을 보낼 경우 모두 처리
     let imageFiles = formData.getAll('images') as File[];
     if (imageFiles.length === 0) {
