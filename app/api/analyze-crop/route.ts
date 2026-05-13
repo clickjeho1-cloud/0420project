@@ -73,7 +73,20 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.text();
-      throw new Error(`Hugging Face API 요청 실패: ${errorData}`);
+      console.error('Hugging Face API 응답 에러:', errorData);
+      
+      let errorMsg = errorData;
+      try {
+        const parsed = JSON.parse(errorData);
+        errorMsg = parsed.error || errorData;
+      } catch(e) {}
+
+      // 💡 모델이 잠들어있어 로딩 중인 경우(콜드 스타트) 친절한 메시지 반환
+      if (response.status === 503 || errorMsg.toLowerCase().includes('loading')) {
+        throw new Error('오픈소스 AI 모델이 현재 서버에서 깨어나는 중입니다(약 1~2분 소요). 잠시 후 진단 버튼을 다시 눌러주세요!');
+      }
+      
+      throw new Error(`허깅페이스 API 오류: ${errorMsg}`);
     }
 
     const result = await response.json();
@@ -81,10 +94,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ analysis: responseText });
 
-  } catch (error) {
-    console.error('이미지 분석 중 오류 발생:', error);
+  } catch (error: any) {
+    console.error('이미지 분석 예외 발생:', error);
     return NextResponse.json(
-      { error: '이미지 분석에 실패했습니다. 이미지 파일이나 서버 상태를 확인해주세요.' }, 
+      { error: error.message || '이미지 분석에 실패했습니다. 이미지 파일이나 서버 상태를 확인해주세요.' }, 
       { status: 500 }
     );
   }
