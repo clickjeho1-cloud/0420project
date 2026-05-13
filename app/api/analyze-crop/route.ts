@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic'; // 빌드 시 정적 페이지 생성 에러 방지
+
 export async function POST(req: NextRequest) {
   try {
     // 💡 환경 변수에서 키를 가져오거나 직접 입력된 키 사용
@@ -84,4 +86,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-export const dynamic = 'force-dynamic';
