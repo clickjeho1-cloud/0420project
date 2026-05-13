@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     `;
 
     // 💡 Hugging Face Qwen Vision 모델 호출
-    const url = `<https://api-inference.huggingface.co/models/Qwen/Qwen2.5-VL-7B-Instruct/v1/chat/completions>`;
+    const url = `https://api-inference.huggingface.co/models/Qwen/Qwen2.5-VL-7B-Instruct/v1/chat/completions`;
     
     const response = await fetch(url, {
       method: 'POST',
