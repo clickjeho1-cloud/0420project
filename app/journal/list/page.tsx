@@ -34,6 +34,9 @@ export default function JournalList() {
         // 💡 Next.js 캐싱을 무시하고 항상 최신 데이터를 DB에서 가져오도록 옵션 추가
         const res = await fetch('/api/journal', { cache: 'no-store' });
         const data = await res.json(); // 💡 누락되어 있던 응답 데이터 파싱 코드 추가!
+        
+        console.log("🔍 [디버그] 서버에서 가져온 영농일지 데이터:", data.data); // 데이터 구조 확인용 로그
+
         if (data.success) {
           setJournals(data.data);
         } else {
