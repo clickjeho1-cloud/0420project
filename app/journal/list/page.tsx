@@ -76,7 +76,7 @@ export default function JournalList() {
             <div key={journal.id || `journal-${index}`} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
               <div style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '15px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#0f172a' }}>📅 {journal.date ? new Date(journal.date).toLocaleDateString() : '날짜 없음'}</span>
-                <span style={{ color: '#64748b', fontSize: '0.9rem' }}>ID: {journal.id ? journal.id.slice(0,8) : '알 수 없음'}</span>
+                <span style={{ color: '#64748b', fontSize: '0.9rem' }}>ID: {journal.id ? String(journal.id).slice(0,8) : '알 수 없음'}</span>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
@@ -96,14 +96,15 @@ export default function JournalList() {
                 urls = journal.photos;
               } else if (typeof journal.photos === 'string') {
                 if (journal.photos.trim().startsWith('[')) {
-                  try { urls = JSON.parse(journal.photos); } catch(e) { urls = [journal.photos]; }
+                  try { const parsed = JSON.parse(journal.photos); urls = Array.isArray(parsed) ? parsed : [journal.photos]; } catch(e) { urls = [journal.photos]; }
                 } else {
                   urls = journal.photos.split(',').filter((url: string) => url.trim() !== '');
                 }
               }
               
+              if (!Array.isArray(urls)) urls = []; // 💡 urls가 확실히 배열인지 한 번 더 보장
               urls = urls.filter(url => typeof url === 'string' && url.trim() !== ''); // 💡 url이 문자열이 아닐 경우 trim() 에러 방지
-              const legacyImages = journal.journal_images || [];
+              const legacyImages = Array.isArray(journal.journal_images) ? journal.journal_images : [];
               if (urls.length === 0 && legacyImages.length === 0) return null;
 
               return (
