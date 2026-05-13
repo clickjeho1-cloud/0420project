@@ -358,30 +358,9 @@ export default function JournalPage() {
             {analysisResult && (
               <div className="result-box">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <h4 style={{ margin: 0, color: '#10b981' }}>📊 AI 종합 진단 리포트</h4>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
-                        notes: prev.notes ? prev.notes + '\n\n[AI 진단 리포트]\n' + analysisResult : '[AI 진단 리포트]\n' + analysisResult
-                      }));
-                      alert('특이사항 입력란에 내용이 추가되었습니다. 폼의 특이사항을 확인해주세요!');
-                    }}
-                    style={{
-                      padding: '0.4rem 0.8rem',
-                      backgroundColor: '#374151',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '0.375rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
-                  >
-                    📝 특이사항으로 복사
-                  </button>
+                  <h4 style={{ margin: 0, color: '#10b981' }}>📊 AI 종합 진단 리포트 <span style={{fontSize: '0.8rem', color: '#9ca3af', fontWeight: 'normal'}}>(특이사항 입력란에 자동 적용됨)</span></h4>
                 </div>
-                <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: '#d1d5db' }}>
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: '#d1d5db', background: '#11131e', padding: '15px', borderRadius: '8px', border: '1px solid #374151' }}>
                   {analysisResult}
                 </div>
               </div>

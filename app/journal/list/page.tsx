@@ -104,7 +104,9 @@ export default function JournalList() {
               
               if (!Array.isArray(urls)) urls = []; // 💡 urls가 확실히 배열인지 한 번 더 보장
               urls = urls.filter(url => typeof url === 'string' && url.trim() !== ''); // 💡 url이 문자열이 아닐 경우 trim() 에러 방지
-              const legacyImages = Array.isArray(journal.journal_images) ? journal.journal_images : [];
+              
+              // 💡 기존 사진(journal_images)이 배열이 아닌 객체로 넘어와서 에러가 났던 현상 방지 및 사진 복구
+              const legacyImages = Array.isArray(journal.journal_images) ? journal.journal_images : (journal.journal_images ? [journal.journal_images] : []);
               if (urls.length === 0 && legacyImages.length === 0) return null;
 
               return (
