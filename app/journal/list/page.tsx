@@ -1,149 +1,86 @@
-"use client";
+import { NextRequest, NextResponse } from 'next/server';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-
-type JournalImage = {
-  id: string;
-  public_url: string;
-  file_name: string;
-  crop_health: string;
-  health_description: string;
-};
-
-type Journal = {
-  id: string;
-  date: string;
-  height: string;
-  leafSize: string;
-  waterAmount: string;
-  notes: string;
-  photos?: any; // 💡 배열, JSON, 쉼표 형태 등 모든 데이터 구조에 대응하기 위해 변경
-  journal_images?: JournalImage[]; // 기존 방식 호환을 위해 옵셔널 처리
-};
-
-export default function JournalList() {
-  const [journals, setJournals] = useState<Journal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchJournals() {
-      try {
-        // 💡 Next.js 캐싱을 무시하고 항상 최신 데이터를 DB에서 가져오도록 옵션 추가
-        const res = await fetch('/api/journal', { cache: 'no-store' });
-        const data = await res.json(); // 💡 누락되어 있던 응답 데이터 파싱 코드 추가!
-        
-        console.log("🔍 [디버그] 서버에서 가져온 영농일지 데이터:", data.data); // 데이터 구조 확인용 로그
-
-        if (data.success) {
-          setJournals(data.data);
-        } else {
-          setError(data.error || '데이터를 불러오는데 실패했습니다.');
-        }
-      } catch (err) {
-        setError('서버와 통신 중 오류가 발생했습니다.');
-      } finally {
-        setLoading(false);
-      }
+export async function POST(req: NextRequest) {
+  try {
+    // 💡 환경 변수에서 키를 가져오거나 직접 입력된 키 사용
+    const apiKey = process.env.GEMINI_API_KEY || "AIzaSyA_EgbdM5d1Qpr0Nv0FyTP1x1G9VsZ6Kkk";
+    if (!apiKey) {
+      console.error('환경 변수에 GEMINI_API_KEY가 설정되지 않았습니다.');
+      return NextResponse.json(
+        { error: '서버에 API 키가 설정되지 않았습니다.' }, 
+        { status: 500 }
+      );
     }
-    fetchJournals();
-  }, []);
 
-  return (
-    <div style={{ padding: '2rem', color: 'white', maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h2 style={{ margin: 0 }}>📖 영농일지 목록</h2>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <Link href="/journal" style={{ padding: '10px 20px', background: '#10b981', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
-            새 일지 작성
-          </Link>
-          <Link href="/dashboard" style={{ padding: '10px 20px', background: '#f59e0b', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
-            대시보드로 돌아가기
-          </Link>
-        </div>
-      </div>
+    const formData = await req.formData();
+    
+    // 💡 프론트엔드에서 여러 장의 사진(images)을 보낼 경우 모두 처리
+    let imageFiles = formData.getAll('images') as File[];
+    if (imageFiles.length === 0) {
+      const singleImage = formData.get('image') as File;
+      if (singleImage) imageFiles.push(singleImage);
+    }
 
-      {loading ? (
-        <p style={{ textAlign: 'center', color: '#94a3b8' }}>데이터를 불러오는 중입니다...</p>
-      ) : error ? (
-        <p style={{ color: '#ef4444', textAlign: 'center' }}>오류: {error}</p>
-      ) : journals.length === 0 ? (
-        <p style={{ color: '#94a3b8', textAlign: 'center' }}>아직 작성된 영농일지가 없습니다.</p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {journals.map((journal) => (
-            <div key={journal.id} style={{ background: '#1e293b', padding: '20px', borderRadius: '12px', border: '1px solid #334155' }}>
-              <div style={{ borderBottom: '1px solid #334155', paddingBottom: '10px', marginBottom: '15px' }}>
-                <h3 style={{ margin: 0, color: '#38bdf8' }}>📅 {new Date(journal.date).toLocaleDateString('ko-KR')}</h3>
-              </div>
-              
-              <div style={{ background: '#0f172a', padding: '15px', borderRadius: '8px', whiteSpace: 'pre-wrap', marginBottom: '15px', lineHeight: '1.6' }}>
-                {journal.notes || '특기사항 없음'}
-              </div>
+    if (imageFiles.length === 0) {
+      return NextResponse.json({ error: '이미지가 하나 이상 업로드되지 않았습니다.' }, { status: 400 });
+    }
 
-            {(() => {
-              let urls: string[] = [];
-              // 💡 1. 배열 형태일 경우
-              if (Array.isArray(journal.photos)) {
-                urls = journal.photos;
-              // 💡 2. 문자열 형태일 경우 (JSON 배열 텍스트 거나 쉼표로 구분된 텍스트)
-              } else if (typeof journal.photos === 'string') {
-                if (journal.photos.trim().startsWith('[')) {
-                  try { urls = JSON.parse(journal.photos); } catch(e) { urls = [journal.photos]; }
-                } else {
-                  urls = journal.photos.split(',').filter((url: string) => url.trim() !== '');
-                }
-              }
-              
-              const legacyImages = journal.journal_images || [];
-              if (urls.length === 0 && legacyImages.length === 0) return null;
+    // 💡 모든 이미지를 Base64 및 AI가 읽을 수 있는 형태로 변환
+    const imageParts = await Promise.all(imageFiles.map(async (file) => {
+      const arrayBuffer = await file.arrayBuffer();
+      const base64Image = Buffer.from(arrayBuffer).toString('base64');
+      return {
+        inlineData: { mimeType: file.type, data: base64Image }
+      };
+    }));
 
-              return (
-                <div>
-                  <strong style={{ color: '#94a3b8', display: 'block', marginBottom: '10px' }}>첨부된 사진:</strong>
-                  <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                    {urls.map((url, idx) => (
-                      <img key={`photo-${idx}`} src={url.trim()} alt={`첨부 사진 ${idx + 1}`} onClick={() => setSelectedImage(url.trim())} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
-                    ))}
-                    {legacyImages.map((img) => (
-                      <img key={img.id} src={img.public_url} alt={img.file_name} onClick={() => setSelectedImage(img.public_url)} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-            </div>
-          ))}
-        </div>
-      )}
+    const prompt = `
+      당신은 스마트팜 농업 전문가이자 식물 병리학자입니다. 
+      제공된 작물 사진을 분석하여 영농일지에 기록할 수 있도록 다음 4가지 항목을 상세히 분석해주세요.
+      결과는 마크다운(Markdown) 형식으로 깔끔하게 정리해서 답변해주세요.
 
-      {/* 이미지 확대 팝업(모달) */}
-      {selectedImage && (
-        <div
-          onClick={() => setSelectedImage(null)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 9999,
-            cursor: 'zoom-out'
-          }}
-        >
-          <img
-            src={selectedImage}
-            alt="확대된 사진"
-            style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.8)' }}
-          />
-        </div>
-      )}
-    </div>
-  );
+      1. 병해충 여부 및 대처법: 현재 보이는 병해충 증상이 있는지 진단하고, 구체적인 친환경적/화학적 대처법 제시
+      2. 생육 단계 및 수확 시기: 현재 작물의 생육 단계를 평가하고 예상 수확 시기 가늠
+      3. 토양 환경 문제 진단: 잎 상태를 통해 수분 부족, 과습, 토양 통기성 등 유추
+      4. 배양액 및 양분 관리 조언: 결핍된 영양소 분석 및 EC/pH 조절 등 배양액 수치 관리 방향 추천
+    `;
+
+    // 💡 SDK 충돌을 피해 정식 v1 REST API로 직접 호출 (404 에러 원천 차단)
+    // 💡 URL 양끝에 꺾쇠괄호(< >)가 없도록 완전히 제거된 상태입니다.
+    const url = `<https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}>`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              ...imageParts, // 여러 장의 사진 데이터 전송
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`Google API 요청 실패: ${errorData}`);
+    }
+
+    const result = await response.json();
+    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '분석 결과를 불러오지 못했습니다.';
+
+    return NextResponse.json({ analysis: responseText });
+
+  } catch (error: any) {
+    console.error('이미지 분석 중 오류 발생:', error);
+    return NextResponse.json(
+      { error: error.message || '이미지 분석에 실패했습니다. 이미지 파일이나 서버 상태를 확인해주세요.' }, 
+      { status: 500 }
+    );
+  }
 }
