@@ -48,8 +48,9 @@ export async function POST(req: NextRequest) {
     `;
 
     // 💡 최신 모델(3.0, 2.0)의 접근(404) 및 할당량(429) 에러를 방지하기 위해
-    // 💡 유료 계정 등록이 완료되었으므로, 이전에 할당량 제한(429)에 걸렸던 최신 'gemini-2.0-flash' 모델을 무제한으로 완벽하게 사용할 수 있습니다!
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    // 💡 현재 API 키가 여전히 무료 티어(Free Tier)로 인식되어 2.0 모델의 할당량이 0으로 차단되었습니다.
+    // 💡 결제 연동이 완전히 반영될 때까지, 안정적인 'gemini-1.5-flash' 정식(v1) 버전으로 다시 우회합니다.
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
