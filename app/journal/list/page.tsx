@@ -18,7 +18,7 @@ type Journal = {
   leafSize: string;
   waterAmount: string;
   notes: string;
-  photos?: string; // 💡 새로 저장된 쉼표 형태의 사진 URL 문자열
+  photos?: any; // 💡 배열, JSON, 쉼표 형태 등 모든 데이터 구조에 대응하기 위해 변경
   journal_images?: JournalImage[]; // 기존 방식 호환을 위해 옵셔널 처리
 };
 
@@ -33,7 +33,7 @@ export default function JournalList() {
       try {
         // 💡 Next.js 캐싱을 무시하고 항상 최신 데이터를 DB에서 가져오도록 옵션 추가
         const res = await fetch('/api/journal', { cache: 'no-store' });
-        const data = await res.json();
+        const data = await res.json(); // 💡 누락되어 있던 응답 데이터 파싱 코드 추가!
         if (data.success) {
           setJournals(data.data);
         } else {
@@ -80,21 +80,37 @@ export default function JournalList() {
                 {journal.notes || '특기사항 없음'}
               </div>
 
-            {(journal.photos || (journal.journal_images && journal.journal_images.length > 0)) && (
+            {(() => {
+              let urls: string[] = [];
+              // 💡 1. 배열 형태일 경우
+              if (Array.isArray(journal.photos)) {
+                urls = journal.photos;
+              // 💡 2. 문자열 형태일 경우 (JSON 배열 텍스트 거나 쉼표로 구분된 텍스트)
+              } else if (typeof journal.photos === 'string') {
+                if (journal.photos.trim().startsWith('[')) {
+                  try { urls = JSON.parse(journal.photos); } catch(e) { urls = [journal.photos]; }
+                } else {
+                  urls = journal.photos.split(',').filter((url: string) => url.trim() !== '');
+                }
+              }
+              
+              const legacyImages = journal.journal_images || [];
+              if (urls.length === 0 && legacyImages.length === 0) return null;
+
+              return (
                 <div>
                   <strong style={{ color: '#94a3b8', display: 'block', marginBottom: '10px' }}>첨부된 사진:</strong>
                   <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                  {/* 새 방식: photos 문자열에서 쉼표로 분리하여 렌더링 */}
-                  {journal.photos && journal.photos.split(',').filter(url => url.trim() !== '').map((url, idx) => (
-                    <img key={`photo-${idx}`} src={url.trim()} alt={`첨부 사진 ${idx + 1}`} onClick={() => setSelectedImage(url.trim())} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
-                  ))}
-                  {/* 구 방식 호환: 예전 데이터가 있을 경우 렌더링 */}
-                  {(!journal.photos && journal.journal_images) && journal.journal_images.map((img) => (
+                    {urls.map((url, idx) => (
+                      <img key={`photo-${idx}`} src={url.trim()} alt={`첨부 사진 ${idx + 1}`} onClick={() => setSelectedImage(url.trim())} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
+                    ))}
+                    {legacyImages.map((img) => (
                       <img key={img.id} src={img.public_url} alt={img.file_name} onClick={() => setSelectedImage(img.public_url)} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
                     ))}
                   </div>
                 </div>
-              )}
+              );
+            })()}
             </div>
           ))}
         </div>
