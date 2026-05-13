@@ -34,7 +34,7 @@ const compressImage = async (file: File): Promise<File> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_WIDTH = 512; // 💡 허깅페이스 용량 초과 에러 방지를 위해 512px로 더욱 압축
+        const MAX_WIDTH = 320; // 💡 허깅페이스 무료 서버를 뚫기 위해 320px로 과감하게 압축
 
         if (width > MAX_WIDTH) {
           height = Math.round((height * MAX_WIDTH) / width);
@@ -49,7 +49,7 @@ const compressImage = async (file: File): Promise<File> => {
         canvas.toBlob((blob) => {
           if (blob) resolve(new File([blob], processFile.name, { type: 'image/jpeg' }));
           else resolve(processFile);
-        }, 'image/jpeg', 0.6); // 💡 60% 품질로 압축 (용량 최소화)
+        }, 'image/jpeg', 0.5); // 💡 50% 품질로 더욱 압축
       };
       img.onerror = () => resolve(processFile);
     };
@@ -161,8 +161,8 @@ export default function JournalPage() {
     try {
       const data = new FormData();
 
-      // 💡 허깅페이스 서버 용량 초과(Payload Too Large) 에러를 막기 위해 분석에는 최대 2장만 전송
-      const imagesForAI = selectedImages.slice(0, 2);
+      // 💡 데이터 폭발 방지: AI에게는 대표 사진 딱 1장만 보냅니다.
+      const imagesForAI = selectedImages.slice(0, 1);
       const compressedFiles = await Promise.all(imagesForAI.map(img => compressImage(img)));
       compressedFiles.forEach(file => data.append('images', file));
 
@@ -184,7 +184,7 @@ export default function JournalPage() {
           const errData = await response.json();
           throw new Error(errData.error || '서버 통신 중 오류가 발생했습니다.');
         } else {
-          throw new Error(`서버 응답 오류(${response.status}): 허깅페이스 서버 지연일 수 있습니다.`);
+          throw new Error(`서버 응답 오류(${response.status}): 용량 초과 또는 서버 지연입니다.`);
         }
       }
 

@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
       4. 배양액 및 양분 관리 조언: 결핍된 영양소 분석 및 EC/pH 조절 등 배양액 수치 관리 방향 추천
     `;
 
-    // 💡 개별 모델 주소 대신 허깅페이스 범용 API 주소로 변경하여 Cannot POST 에러를 해결합니다.
-    const url = `https://api-inference.huggingface.co/v1/chat/completions`;
+    // 💡 범용 API 주소에서 에러가 났으므로, 2.0 모델 전용 API 경로로 명확하게 재지정합니다.
+    const url = `https://api-inference.huggingface.co/models/Qwen/Qwen2-VL-7B-Instruct/v1/chat/completions`;
     
     const response = await fetch(url, {
       method: 'POST',
