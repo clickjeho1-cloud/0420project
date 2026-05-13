@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
-    // 💡 새로 발급받은 Hugging Face 토큰 강제 삽입
-    const hfToken = process.env.HF_API_TOKEN || "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";
+    // 💡 보안을 위해 하드코딩된 토큰을 제거하고 환경 변수만 사용합니다.
+    const hfToken = process.env.HF_API_TOKEN;
     if (!hfToken) {
       console.error('환경 변수에 HF_API_TOKEN이 설정되지 않았습니다.');
       return NextResponse.json(
