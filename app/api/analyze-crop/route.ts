@@ -45,9 +45,9 @@ export async function POST(req: NextRequest) {
       4. 배양액 및 양분 관리 조언: 결핍된 영양소 분석 및 EC/pH 조절 등 배양액 수치 관리 방향 추천
     `;
 
-    // 💡 SDK 충돌을 피해 정식 v1 REST API로 직접 호출 (404 에러 원천 차단)
+    // 💡 SDK 충돌을 피하기 위해 직접 호출하되, 1.5 최신 모델 지원을 위해 v1beta 및 flash-latest 버전을 사용합니다.
     // 💡 URL 양끝에 꺾쇠괄호(< >)가 없도록 완전히 제거된 상태입니다.
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
