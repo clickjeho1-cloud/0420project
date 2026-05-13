@@ -45,9 +45,9 @@ export async function POST(req: NextRequest) {
       4. 배양액 및 양분 관리 조언: 결핍된 영양소 분석 및 EC/pH 조절 등 배양액 수치 관리 방향 추천
     `;
 
-    // 💡 최신 검색 결과에 맞춰, 현존하는 가장 빠르고 뛰어난 성능의 'Gemini 3 Flash' 모델로 업그레이드합니다.
-    // (최신 모델 지원을 위해 v1beta API를 사용합니다)
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`;
+    // 💡 최신 모델(3.0, 2.0)의 접근(404) 및 할당량(429) 에러를 방지하기 위해
+    // 💡 무료 제공량이 보장되고 가장 안정적인 'gemini-1.5-flash' 모델(v1 API)로 설정합니다.
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
