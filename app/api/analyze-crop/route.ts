@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
       4. 배양액 및 양분 관리 조언: 결핍된 영양소 분석 및 EC/pH 조절 등 배양액 수치 관리 방향 추천
     `;
 
-    // 💡 Hugging Face Qwen Vision 모델 호출
-    const url = `https://api-inference.huggingface.co/models/Qwen/Qwen2.5-VL-7B-Instruct/v1/chat/completions`;
+    // 💡 개별 모델 주소 대신 허깅페이스 범용 API 주소로 변경하여 Cannot POST 에러를 해결합니다.
+    const url = `https://api-inference.huggingface.co/v1/chat/completions`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "Qwen/Qwen2.5-VL-7B-Instruct",
+        model: "Qwen/Qwen2-VL-7B-Instruct", // 💡 최신 2.5 버전은 무료 서버 통신 규격이 불안정하므로 안정적인 2.0 버전으로 다운그레이드
         messages: [
           {
             role: "user",
