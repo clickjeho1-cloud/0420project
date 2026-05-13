@@ -46,8 +46,8 @@ export async function POST(req: NextRequest) {
     `;
 
     // 💡 최신 모델(3.0, 2.0)의 접근(404) 및 할당량(429) 에러를 방지하기 위해
-    // 💡 무료 제공량이 보장되고 가장 안정적인 'gemini-1.5-flash' 모델(v1 API)로 설정합니다.
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // 💡 v1 경로에서는 모델을 찾을 수 없으므로, 지원되는 v1beta 경로로 수정하여 호출합니다.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
