@@ -4,7 +4,7 @@ git push  ///
 업로드시 배포시 필수 명령 윈도우에 파워셀에서
 
 
-npm run dev:all  서버 가동
+npm run dev:all  서버 가동  npm run dev
 ==============
 기상청 키  
 

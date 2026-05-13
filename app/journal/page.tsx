@@ -165,6 +165,12 @@ export default function JournalPage() {
       const compressedFiles = await Promise.all(selectedImages.map(compressImage));
       compressedFiles.forEach(file => data.append('images', file));
 
+      // 💡 AI가 분석 시 참고할 수 있도록 현재 폼에 입력된 수치 데이터를 함께 전송
+      data.append('ec', formData.ecManagement);
+      data.append('ph', formData.phSupply);
+      data.append('water', formData.waterAmount);
+      data.append('height', formData.height);
+
       const response = await fetch('/api/analyze-crop', {
         method: 'POST',
         body: data,
@@ -334,9 +340,14 @@ export default function JournalPage() {
           </div>
 
           <div className="ai-section">
-            <h3 style={{ marginTop: 0, marginBottom: '10px', color: '#fff' }}>📸 사진 업로드 및 AI 분석</h3>
+            <div className="ai-header">
+              <h2 className="ai-title"><span>🌿</span> AI 지능형 작물 분석</h2>
+              <button type="button" className={`btn-ai ${isAnalyzing ? 'analyzing' : ''}`} onClick={analyzeImage} disabled={selectedImages.length === 0 || isAnalyzing}>
+                {isAnalyzing ? '분석 중...' : '실시간 진단 실행'}
+              </button>
+            </div>
             <p style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '15px' }}>
-              사진을 업로드하면 AI가 작물의 생육 상태와 병해충을 정밀 분석해줍니다.
+              사진을 업로드하고 폼에 수치를 입력한 뒤 진단하면, 30년 경력의 AI 농학자가 정밀 분석해 줍니다.
             </p>
             
             <input type="file" accept="image/*" multiple onChange={handleImageChange} style={{ marginBottom: '15px' }} />
@@ -358,25 +369,33 @@ export default function JournalPage() {
               </div>
             )}
 
-            <button type="button" className="btn-ai" onClick={analyzeImage} disabled={selectedImages.length === 0 || isAnalyzing}>
-              {isAnalyzing ? 'AI가 정밀 분석 중입니다...' : '업로드한 사진 AI로 진단하기'}
-            </button>
-
             {errorMessage && (
               <div className="error-box">
                 🚨 {errorMessage}
               </div>
             )}
 
-            {analysisResult && (
+            {analysisResult ? (
               <div className="result-box">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                   <h4 style={{ margin: 0, color: '#10b981' }}>📊 AI 종합 진단 리포트 <span style={{fontSize: '0.8rem', color: '#9ca3af', fontWeight: 'normal'}}>(특이사항 입력란에 자동 적용됨)</span></h4>
                 </div>
-                <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: '#d1d5db', background: '#11131e', padding: '15px', borderRadius: '8px', border: '1px solid #374151' }}>
-                  {analysisResult}
-                </div>
+                <div 
+                  style={{ lineHeight: '1.6', color: '#d1d5db', background: '#11131e', padding: '15px', borderRadius: '8px', border: '1px solid #10b981' }}
+                  dangerouslySetInnerHTML={{
+                    __html: analysisResult
+                      .replace(/### (.*)/g, '<h3 style="color: #34d399; margin-top: 15px; margin-bottom: 5px;">$1</h3>')
+                      .replace(/## (.*)/g, '<h2 style="color: #10b981; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #374151; padding-bottom: 5px;">$1</h2>')
+                      .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #fff; background: rgba(16, 185, 129, 0.2); padding: 0 4px; border-radius: 4px;">$1</strong>')
+                      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                      .replace(/\n/g, '<br />')
+                  }}
+                />
               </div>
+            ) : (
+              <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0', margin: 0, border: '1px dashed #374151', borderRadius: '8px' }}>
+                사진을 등록하고 "실시간 진단 실행" 버튼을 누르면 분석이 시작됩니다.
+              </p>
             )}
           </div>
 
@@ -461,9 +480,28 @@ export default function JournalPage() {
         .ai-section {
           margin-top: 2rem;
           padding: 1.5rem;
-          background-color: #151826;
+          background-color: #1a1d2d;
           border: 1px solid #374151;
+          border-top: 4px solid #10b981;
           border-radius: 0.75rem;
+          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+        }
+        .ai-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        }
+        .ai-title {
+          font-size: 1.25rem;
+          font-weight: bold;
+          color: #f3f4f6;
+          display: flex;
+          align-items: center;
+          margin: 0;
+        }
+        .ai-title span {
+          margin-right: 0.5rem;
         }
         .btn-submit {
           width: 100%;
@@ -481,15 +519,19 @@ export default function JournalPage() {
           background-color: #059669;
         }
         .btn-ai {
-          padding: 0.75rem 1.5rem;
-          background-color: #2563eb;
+          padding: 0.5rem 1rem;
+          background-color: #10b981;
           color: white;
           border: none;
           border-radius: 0.5rem;
           cursor: pointer;
           font-weight: bold;
+          transition: background-color 0.2s;
         }
-        .btn-ai:disabled {
+        .btn-ai:hover {
+          background-color: #059669;
+        }
+        .btn-ai:disabled, .btn-ai.analyzing {
           background-color: #4b5563;
           cursor: not-allowed;
         }
