@@ -48,8 +48,8 @@ export async function POST(req: NextRequest) {
     `;
 
     // 💡 최신 모델(3.0, 2.0)의 접근(404) 및 할당량(429) 에러를 방지하기 위해
-    // 💡 1.5 모델들의 접근이 제한된 키 환경이므로, 100% 무료 지원되는 이미지 특화 모델 'gemini-1.0-pro-vision-latest'로 우회합니다.
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro-vision-latest:generateContent?key=${apiKey}`;
+    // 💡 유료 계정(결제 등록) 환경에서 가장 빠르고 저렴하게 작동하는 표준 모델 'gemini-1.5-flash'로 복구합니다.
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',

@@ -183,6 +183,19 @@ export default function JournalPage() {
 
       const resultData = await response.json();
       setAnalysisResult(resultData.analysis);
+      
+      // 💡 AI 분석 완료 시 사용자가 버튼을 누르지 않아도 특이사항(notes)에 자동 입력되도록 추가
+      setFormData(prev => {
+        const baseNotes = prev.notes.includes('[AI 진단 리포트]') 
+          ? prev.notes.split('[AI 진단 리포트]')[0].trim() 
+          : prev.notes.trim();
+          
+        const newNotes = baseNotes 
+          ? baseNotes + '\n\n[AI 진단 리포트]\n' + resultData.analysis 
+          : '[AI 진단 리포트]\n' + resultData.analysis;
+          
+        return { ...prev, notes: newNotes };
+      });
     } catch (error: any) {
       console.error('분석 오류:', error);
       setErrorMessage(error.message);
