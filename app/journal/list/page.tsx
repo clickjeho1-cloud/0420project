@@ -33,7 +33,8 @@ export default function JournalList() {
         const data = await res.json();
         
         if (data.success) {
-          setJournals(data.data);
+          // 💡 서버에서 온 데이터가 배열이 아닌 경우 앱이 터지는 것(map error) 방지
+          setJournals(Array.isArray(data.data) ? data.data : (data.data ? [data.data] : []));
         } else {
           setError('데이터를 불러오는데 실패했습니다.');
         }
@@ -69,11 +70,13 @@ export default function JournalList() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {journals.map((journal) => (
-            <div key={journal.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+          {journals.map((journal, index) => {
+            if (!journal) return null; // 💡 비어있는 데이터 행이 있을 경우 무시
+            return (
+            <div key={journal.id || `journal-${index}`} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
               <div style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '15px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#0f172a' }}>📅 {new Date(journal.date).toLocaleDateString()}</span>
-                <span style={{ color: '#64748b', fontSize: '0.9rem' }}>ID: {journal.id.slice(0,8)}</span>
+                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#0f172a' }}>📅 {journal.date ? new Date(journal.date).toLocaleDateString() : '날짜 없음'}</span>
+                <span style={{ color: '#64748b', fontSize: '0.9rem' }}>ID: {journal.id ? journal.id.slice(0,8) : '알 수 없음'}</span>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
@@ -99,6 +102,7 @@ export default function JournalList() {
                 }
               }
               
+              urls = urls.filter(url => typeof url === 'string' && url.trim() !== ''); // 💡 url이 문자열이 아닐 경우 trim() 에러 방지
               const legacyImages = journal.journal_images || [];
               if (urls.length === 0 && legacyImages.length === 0) return null;
 
@@ -110,14 +114,14 @@ export default function JournalList() {
                       <img key={`photo-${idx}`} src={url.trim()} alt={`첨부 사진 ${idx + 1}`} onClick={() => setSelectedImage(url.trim())} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
                     ))}
                     {legacyImages.map((img) => (
-                      <img key={img.id} src={img.public_url} alt={img.file_name} onClick={() => setSelectedImage(img.public_url)} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
+                      img?.public_url && <img key={img.id || img.public_url} src={img.public_url} alt={img.file_name || '사진'} onClick={() => setSelectedImage(img.public_url)} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
                     ))}
                   </div>
                 </div>
               );
             })()}
             </div>
-          ))}
+          );})}
         </div>
       )}
 
