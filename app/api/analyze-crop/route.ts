@@ -1,28 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const dynamic = 'force-dynamic'; // 빌드 시 정적 페이지 생성 에러 방지
-
 export async function POST(req: NextRequest) {
   try {
-    // 💡 환경 변수에서 키를 가져오거나 직접 입력된 새 유료 API 키 사용
-    const apiKey = process.env.GEMINI_API_KEY || "AIzaSyCkJXfg2S8dMZBFqMlxXZMS1jZUUblfkNs";
-    if (!apiKey) {
-      console.error('환경 변수에 GEMINI_API_KEY가 설정되지 않았습니다.');
+    // 💡 새로 발급받은 Hugging Face 토큰 강제 삽입
+    const hfToken = process.env.HF_API_TOKEN || "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";
+    if (!hfToken) {
+      console.error('환경 변수에 HF_API_TOKEN이 설정되지 않았습니다.');
       return NextResponse.json(
-        { error: '서버에 API 키가 설정되지 않았습니다.' }, 
+        { error: '서버에 Hugging Face 토큰이 설정되지 않았습니다. .env.local 파일을 확인해주세요.' }, 
         { status: 500 }
       );
     }
 
     const formData = await req.formData();
-    
-    // 💡 프론트엔드에서 보낸 폼 데이터를 변수로 읽어옵니다 (이 부분이 추가되어야 에러가 안 납니다!)
-    const height = formData.get('height') || '미입력';
-    const water = formData.get('water') || '미입력';
-    const ec = formData.get('ec') || '미입력';
-    const ph = formData.get('ph') || '미입력';
-
-    // 💡 프론트엔드에서 여러 장의 사진(images)을 보낼 경우 모두 처리
+    // 💡 프론트엔드에서 여러 장의 사진을 보낼 경우 모두 처리하도록 업데이트
     let imageFiles = formData.getAll('images') as File[];
     if (imageFiles.length === 0) {
       const singleImage = formData.get('image') as File;
@@ -33,86 +24,67 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '이미지가 하나 이상 업로드되지 않았습니다.' }, { status: 400 });
     }
 
-    // 💡 모든 이미지를 Base64 및 AI가 읽을 수 있는 형태로 변환
-    const imageParts = await Promise.all(imageFiles.map(async (file) => {
+    // 💡 Hugging Face가 읽을 수 있는 객체 형태로 변환
+    const imageContents = await Promise.all(imageFiles.map(async (file) => {
       const arrayBuffer = await file.arrayBuffer();
       const base64Image = Buffer.from(arrayBuffer).toString('base64');
       return {
-        inlineData: { mimeType: file.type, data: base64Image }
+        type: "image_url",
+        image_url: {
+          url: `data:${file.type};base64,${base64Image}`
+        }
       };
     }));
 
     const prompt = `
-      당신은 30년 경력의 '스마트팜 정밀 농업 컨설턴트'입니다. 
-      제공된 작물 사진과 아래의 입력 데이터를 바탕으로 [작물 종합 진단 리포트]를 작성하세요.
+      당신은 스마트팜 농업 전문가이자 식물 병리학자입니다. 
+      제공된 작물 사진을 분석하여 영농일지에 기록할 수 있도록 다음 4가지 항목을 상세히 분석해주세요.
+      결과는 마크다운(Markdown) 형식으로 깔끔하게 정리해서 답변해주세요.
 
-      [현재 실시간 농장 데이터]
-      - 작물 초장(키): ${height} cm
-      - 일일 관수량: ${water} L
-      - 배양액 EC: ${ec} dS/m
-      - 배양액 pH: ${ph}
-
-      [분석 지시사항]
-      1. 현재 환경 진단: 데이터와 사진을 종합하여 현재 상태의 '위험도(최적/주의/위험)'를 판정하세요.
-      2. 병해충 및 이상 증상: 사진에서 보이는 잎의 색, 모양 등을 분석하여 결핍 증상(예: 팁번, 칼슘 결핍, 곰팡이 등)을 특정하세요.
-      3. 즉각적인 조치 사항: 장비 제어(예: 환풍기 가동), 양액 농도(EC/pH) 조절 등 농민이 바로 실행할 수 있도록 조언을 숫자로 명확히 제안하세요.
-
-      답변은 농민이 이해하기 쉽게 친절한 한국어로 작성하고, 소제목은 '##' 기호로, 핵심 문장은 '**'로 굵게 표시해 주세요.
+      1. 병해충 여부 및 대처법: 현재 보이는 병해충 증상이 있는지 진단하고, 구체적인 친환경적/화학적 대처법 제시
+      2. 생육 단계 및 수확 시기: 현재 작물의 생육 단계를 평가하고 예상 수확 시기 가늠
+      3. 토양 환경 문제 진단: 잎 상태를 통해 수분 부족, 과습, 토양 통기성 등 유추
+      4. 배양액 및 양분 관리 조언: 결핍된 영양소 분석 및 EC/pH 조절 등 배양액 수치 관리 방향 추천
     `;
 
-    // 💡 최신 모델(3.0, 2.0)의 접근(404) 및 할당량(429) 에러를 방지하기 위해
-    // 💡 현재 API 키가 여전히 무료 티어(Free Tier)로 인식되어 2.0 모델의 할당량이 0으로 차단되었습니다.
-    // 💡 결제 연동이 완전히 반영될 때까지, 안정적인 'gemini-1.5-flash' 정식(v1) 버전으로 다시 우회합니다.
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // 💡 Hugging Face Qwen Vision 모델 호출
+    const url = `https://api-inference.huggingface.co/models/Qwen/Qwen2.5-VL-7B-Instruct/v1/chat/completions`;
     
     const response = await fetch(url, {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${hfToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        contents: [
+        model: "Qwen/Qwen2.5-VL-7B-Instruct",
+        messages: [
           {
-            parts: [
-              { text: prompt },
-              ...imageParts, // 여러 장의 사진 데이터 전송
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              ...imageContents, // 💡 변환된 여러 장의 사진 데이터를 한 번에 전송
             ],
           },
         ],
+        max_tokens: 1500,
       }),
     });
 
     if (!response.ok) {
-      console.warn('API 한도 초과: 임시 가상 데이터로 대체합니다.');
-      
-      // 💡 API 키가 제한에 걸리더라도 앱이 고장 나지 않도록, 임시 가상 리포트를 반환합니다.
-      const mockAnalysis = `
-## 📊 (임시) AI 종합 진단 리포트
-*⚠️ 현재 구글 API 키 사용량이 초과되어 가상의 분석 결과가 제공되었습니다.*
-
-**1. 현재 환경 진단**
-- 입력하신 데이터(초장: ${height}cm, 관수량: ${water}L, EC: ${ec}, pH: ${ph})를 기준으로 분석한 결과, 현재 작물 상태는 **'주의'** 단계입니다.
-
-**2. 병해충 및 이상 증상**
-- 사진 분석 결과, 잎 가장자리가 마르는 **팁번(Tip-burn)** 초기 증상이 의심됩니다.
-
-**3. 즉각적인 조치 사항**
-- **온실 제어:** 환풍기를 가동하여 공기 순환을 촉진해 주세요.
-- **양액 조절:** 배양액 EC를 현재 수치에서 0.2 dS/m 정도 낮추어 공급할 것을 권장합니다.
-      `.trim();
-      
-      return NextResponse.json({ analysis: mockAnalysis });
+      const errorData = await response.text();
+      throw new Error(`Hugging Face API 요청 실패: ${errorData}`);
     }
 
     const result = await response.json();
-    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '분석 결과를 불러오지 못했습니다.';
+    const responseText = result.choices?.[0]?.message?.content || '분석 결과를 불러오지 못했습니다.';
 
     return NextResponse.json({ analysis: responseText });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('이미지 분석 중 오류 발생:', error);
     return NextResponse.json(
-      { error: error.message || '이미지 분석에 실패했습니다. 이미지 파일이나 서버 상태를 확인해주세요.' }, 
+      { error: '이미지 분석에 실패했습니다. 이미지 파일이나 서버 상태를 확인해주세요.' }, 
       { status: 500 }
     );
   }

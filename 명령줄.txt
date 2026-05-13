@@ -3,7 +3,20 @@ git commit -m "update"
 git push  ///
 업로드시 배포시 필수 명령 윈도우에 파워셀에서
 
+때, 만약 예전처럼 429 Quota Exceeded (limit: 0) 에러가 뜬다면 이는 코드 문제가 아니라 '구글의 한국 지역 제한 정책' 때문입니다. 구글은 한국 IP로 생성된 무료 계정의 이미지 분석을 0건으로 차단해 두었습니다.
 
+이를 결제 카드 없이 완벽하게 무료로 우회하는 비법은 다음과 같습니다.
+
+PC나 스마트폰에서 무료 VPN 프로그램(예: 터널베어, SoftEther 등)을 켭니다.
+접속 국가를 **미국(USA) 또는 일본(Japan)**으로 설정합니다.
+그 상태에서 구글 AI Studio에 접속하여 새로운 API 키를 하나 발급받습니다.
+발급받은 새 키를 위 코드의 apiKey 부분에 붙여넣기 합니다.
+이렇게 하시면 구글 시스템이 회원님을 미국 사용자로 인식하여 결제 카드를 전혀 등록하지 않아도 무료 버전의 AI 분석 기능(할당량 무제한)을 평생 우회해서 사용하실 수 있습니다!
+
+https://huggingface.co/settings/tokens에서 토큰 받고 적용$$$$$================
+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   
+
+Gen
 npm run dev:all  서버 가동  npm run dev
 ==============
 기상청 키  
