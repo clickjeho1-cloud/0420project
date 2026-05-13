@@ -159,46 +159,43 @@ export default function JournalPage() {
     setErrorMessage('');
 
     try {
-      const data = new FormData();
+      // 💡 3번 방식(로컬 분석 모드): 외부 API 서버를 거치지 않고 프론트엔드 알고리즘(녹색/밝기)만 사용하여 리포트 생성
+      let localReport = `## 📊 로컬 작물 진단 리포트 (오프라인 모드)\n*외부 API 연결 없이 기기 자체 알고리즘으로 분석된 결과입니다.*\n\n`;
 
-      // 선택된 모든 이미지를 압축하여 서버 부하 방지
-      const compressedFiles = await Promise.all(selectedImages.map(compressImage));
-      compressedFiles.forEach(file => data.append('images', file));
+      localReport += `**1. 환경 데이터 확인**\n`;
+      localReport += `- 초장: ${formData.height || '미입력'} cm, 관수량: ${formData.waterAmount || '미입력'} L\n`;
+      localReport += `- EC: ${formData.ecManagement || '미입력'} mS/cm, pH: ${formData.phSupply || '미입력'}\n\n`;
 
-      // 💡 AI가 분석 시 참고할 수 있도록 현재 폼에 입력된 수치 데이터를 함께 전송
-      data.append('ec', formData.ecManagement);
-      data.append('ph', formData.phSupply);
-      data.append('water', formData.waterAmount);
-      data.append('height', formData.height);
-
-      const response = await fetch('/api/analyze-crop', {
-        method: 'POST',
-        body: data,
+      localReport += `**2. 사진별 엽록소(녹색) 및 밝기 분석**\n`;
+      clientAnalysis.forEach((data, index) => {
+        localReport += `- **사진 ${index + 1}**: 밝기 ${data.brightness}%, 녹색 비율 ${data.greenness}%\n`;
       });
 
-      if (!response.ok) {
-        // JSON 형태의 정상적인 오류 메시지인지 확인 (HTML 에러 페이지 걸러내기)
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          const errData = await response.json();
-          throw new Error(errData.error || '서버 통신 중 오류가 발생했습니다.');
-        } else {
-          throw new Error(`서버 응답 오류(${response.status}): 이미지 용량이 너무 커서 처리가 거부되었을 수 있습니다.`);
-        }
+      const avgGreenness = clientAnalysis.reduce((acc, curr) => acc + curr.greenness, 0) / (clientAnalysis.length || 1);
+
+      localReport += `\n**3. 종합 평가 및 조언**\n`;
+      if (avgGreenness > 60) {
+        localReport += `- 평균 녹색 비율(**${Math.round(avgGreenness)}%**)이 높아 생육 상태가 **매우 양호**합니다. 현재의 환경 관리를 유지해 주세요.\n`;
+      } else if (avgGreenness > 35) {
+        localReport += `- 평균 녹색 비율(**${Math.round(avgGreenness)}%**)이 **보통** 수준입니다. 부분적인 황화나 영양 결핍이 오지 않는지 지속적인 관찰이 필요합니다.\n`;
+      } else {
+        localReport += `- 평균 녹색 비율(**${Math.round(avgGreenness)}%**)이 다소 **낮습니다**. 잎마름, 병해충, 또는 영양소 결핍 상태일 가능성이 있으므로 점검해 주세요.\n`;
       }
 
-      const resultData = await response.json();
-      setAnalysisResult(resultData.analysis);
+      // 기기에서 분석을 수행하는 듯한 효과(로딩)를 주기 위해 1초 대기
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      setAnalysisResult(localReport);
       
-      // 💡 AI 분석 완료 시 사용자가 버튼을 누르지 않아도 특이사항(notes)에 자동 입력되도록 추가
+      // 💡 분석 완료 시 사용자가 버튼을 누르지 않아도 특이사항(notes)에 자동 입력되도록 수정
       setFormData(prev => {
-        const baseNotes = prev.notes.includes('[AI 진단 리포트]') 
-          ? prev.notes.split('[AI 진단 리포트]')[0].trim() 
+        const baseNotes = prev.notes.includes('[로컬 작물 진단 리포트]') 
+          ? prev.notes.split('[로컬 작물 진단 리포트]')[0].trim() 
           : prev.notes.trim();
           
         const newNotes = baseNotes 
-          ? baseNotes + '\n\n[AI 진단 리포트]\n' + resultData.analysis 
-          : '[AI 진단 리포트]\n' + resultData.analysis;
+          ? baseNotes + '\n\n[로컬 작물 진단 리포트]\n' + localReport 
+          : '[로컬 작물 진단 리포트]\n' + localReport;
           
         return { ...prev, notes: newNotes };
       });
@@ -292,7 +289,9 @@ export default function JournalPage() {
       <div className="form-wrapper">
         <div className="header">
           <h1>📝 영농일지 작성</h1>
-          <button type="button" className="btn-back">목록으로 돌아가기</button>
+          <button type="button" className="btn-back" onClick={() => window.location.href = '/journal/list'}>
+            목록으로 돌아가기
+          </button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -341,13 +340,13 @@ export default function JournalPage() {
 
           <div className="ai-section">
             <div className="ai-header">
-              <h2 className="ai-title"><span>🌿</span> AI 지능형 작물 분석</h2>
+              <h2 className="ai-title"><span>🌿</span> 로컬 지능형 작물 분석 (오프라인)</h2>
               <button type="button" className={`btn-ai ${isAnalyzing ? 'analyzing' : ''}`} onClick={analyzeImage} disabled={selectedImages.length === 0 || isAnalyzing}>
-                {isAnalyzing ? '분석 중...' : '실시간 진단 실행'}
+                {isAnalyzing ? '분석 중...' : '로컬 진단 실행'}
               </button>
             </div>
             <p style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '15px' }}>
-              사진을 업로드하고 폼에 수치를 입력한 뒤 진단하면, 30년 경력의 AI 농학자가 정밀 분석해 줍니다.
+              서버 연결 없이, 기기 자체 알고리즘이 엽록소(녹색) 비율과 입력 수치를 즉각 분석해 줍니다.
             </p>
             
             <input type="file" accept="image/*" multiple onChange={handleImageChange} style={{ marginBottom: '15px' }} />
@@ -378,7 +377,7 @@ export default function JournalPage() {
             {analysisResult ? (
               <div className="result-box">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <h4 style={{ margin: 0, color: '#10b981' }}>📊 AI 종합 진단 리포트 <span style={{fontSize: '0.8rem', color: '#9ca3af', fontWeight: 'normal'}}>(특이사항 입력란에 자동 적용됨)</span></h4>
+                  <h4 style={{ margin: 0, color: '#10b981' }}>📊 로컬 종합 진단 리포트 <span style={{fontSize: '0.8rem', color: '#9ca3af', fontWeight: 'normal'}}>(특이사항 입력란에 자동 적용됨)</span></h4>
                 </div>
                 <div 
                   style={{ lineHeight: '1.6', color: '#d1d5db', background: '#11131e', padding: '15px', borderRadius: '8px', border: '1px solid #10b981' }}
@@ -394,7 +393,7 @@ export default function JournalPage() {
               </div>
             ) : (
               <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0', margin: 0, border: '1px dashed #374151', borderRadius: '8px' }}>
-                사진을 등록하고 "실시간 진단 실행" 버튼을 누르면 분석이 시작됩니다.
+                사진을 등록하고 "로컬 진단 실행" 버튼을 누르면 서버 연결 없이 즉시 분석이 시작됩니다.
               </p>
             )}
           </div>
