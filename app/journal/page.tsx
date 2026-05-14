@@ -240,6 +240,7 @@ export default function JournalPage() {
       if (journalError) throw journalError;
 
       const journalId = journalData.id;
+      const uploadedUrls: string[] = [];
 
       // 2. Storage에 사진 업로드 후, 예전 목록에서 잘 보였던 방식대로 journal_images 테이블에 연결
       if (selectedImages.length > 0) {
@@ -260,6 +261,8 @@ export default function JournalPage() {
           const { data: publicUrlData } = supabase.storage
             .from('journal-images')
             .getPublicUrl(fileName);
+            
+          uploadedUrls.push(publicUrlData.publicUrl);
 
           // 3. journal_images 테이블에 각각의 이미지 정보를 삽입하여 목록(List) 화면과 완벽 연동
           await supabase
@@ -271,6 +274,14 @@ export default function JournalPage() {
                 file_name: fileName
               }
             ]);
+        }
+        
+        // 💡 API 라우트를 수정하지 않아도 최신 사진이 100% 조회되도록 journals 테이블의 photos 컬럼에 URL을 직접 보장합니다.
+        if (uploadedUrls.length > 0) {
+          await supabase
+            .from('journals')
+            .update({ photos: JSON.stringify(uploadedUrls) })
+            .eq('id', journalId);
         }
       }
 

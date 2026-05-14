@@ -131,8 +131,11 @@ export default function Dashboard() {
     setControl((prev) => {
       const next = !prev[key];
       if (clientRef.current && clientRef.current.connected) {
-        // 직관적인 JSON 명령어 전송 ( {"device":"pump", "state":true} 형태 )
-        const command = { device: key, state: next };
+        // 기기가 인식할 수 있는 JSON 명령어 포맷으로 전송
+        const command: any = { cmd_type: "manual", devices: { [key]: { on: next } } };
+        if (key === 'pump' && next) {
+          command.devices.pump.duration_sec = 10; // 펌프 10초 가동 후 자동 종료
+        }
         console.log(`[MQTT 전송 완료] smartfarm/jeho123/control ->`, command);
         clientRef.current.publish('smartfarm/jeho123/control', JSON.stringify(command));
       } else {
@@ -256,13 +259,27 @@ export default function Dashboard() {
         </div>
         <ResponsiveContainer width="100%" height={320}>
           <AreaChart data={history.length ? history : [{ time: '--', temp: 0, hum: 0, ec: 0 }]}>
-            <CartesianGrid stroke="#1f2937" />
-            <XAxis dataKey="time" />
-            <YAxis />
-            <Tooltip />
-            <Area isAnimationActive={false} type="monotone" dataKey="temp" stroke="#ff4d4d" fillOpacity={0.2} fill="#ff4d4d" name="온도" />
-            <Area isAnimationActive={false} type="monotone" dataKey="hum" stroke="#4da6ff" fillOpacity={0.2} fill="#4da6ff" name="습도" />
-            <Area isAnimationActive={false} type="monotone" dataKey="ec" stroke="#22c55e" fillOpacity={0.2} fill="#22c55e" name="EC" />
+            <defs>
+              <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ff4d4d" stopOpacity={0.7}/>
+                <stop offset="95%" stopColor="#ff4d4d" stopOpacity={0}/>
+              </linearGradient>
+              <linearGradient id="colorHum" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#4da6ff" stopOpacity={0.7}/>
+                <stop offset="95%" stopColor="#4da6ff" stopOpacity={0}/>
+              </linearGradient>
+              <linearGradient id="colorEc" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.7}/>
+                <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="time" stroke="#94a3b8" tick={{fontSize: 12}} />
+            <YAxis stroke="#94a3b8" tick={{fontSize: 12}} />
+            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#f8fafc' }} />
+            <Area isAnimationActive={false} type="monotone" dataKey="temp" stroke="#ff4d4d" strokeWidth={3} fillOpacity={1} fill="url(#colorTemp)" name="온도" />
+            <Area isAnimationActive={false} type="monotone" dataKey="hum" stroke="#4da6ff" strokeWidth={3} fillOpacity={1} fill="url(#colorHum)" name="습도" />
+            <Area isAnimationActive={false} type="monotone" dataKey="ec" stroke="#22c55e" strokeWidth={3} fillOpacity={1} fill="url(#colorEc)" name="EC" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
