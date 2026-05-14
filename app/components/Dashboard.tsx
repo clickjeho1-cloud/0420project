@@ -200,6 +200,13 @@ export default function Dashboard() {
         <h2>📷 실시간 모니터링 영상</h2>
         <div className="camera-grid">
           <div className="camera-card">
+            <h3>라즈베리파이 (USB 캠)</h3>
+            <div className="video-wrapper">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="http://[라즈베리파이IP주소]:8080/stream" alt="Raspberry Pi Cam" />
+            </div>
+          </div>
+          <div className="camera-card">
             <h3>내부 카메라 (ESP32-CAM)</h3>
             <div className="video-wrapper">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -210,7 +217,7 @@ export default function Dashboard() {
             <h3>참고 영상 (YouTube)</h3>
             <div className="video-wrapper iframe-wrapper">
               <iframe 
-                src="https://www.youtube.com/embed/b4nXr11Ja8o?list=RDb4nXr11Ja8o&autoplay=1&mute=1" 
+                src="https://www.youtube.com/embed/b4nXr11Ja8o?list=RDb4nXr11Ja8o&autoplay=1" 
                 frameBorder="0" 
                 allow="autoplay; encrypted-media" 
                 allowFullScreen
@@ -346,7 +353,7 @@ export default function Dashboard() {
         .weather-meta strong { color: #f8fafc; }
         .camera-panel { background: #0b1220; padding: 18px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
         .camera-panel h2 { margin-top: 0; color: #e2e8f0; font-size: 18px; }
-        .camera-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .camera-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
         .camera-card { background: #111827; padding: 14px; border-radius: 10px; border: 1px solid #334155; }
         .camera-card h3 { margin-top: 0; color: #cbd5e1; font-size: 15px; margin-bottom: 12px; text-align: center; }
         .video-wrapper { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; }
