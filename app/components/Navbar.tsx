@@ -15,7 +15,9 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="logo">
-        <Link href="/dashboard">🌱 Glover Smart Farm</Link>
+        <Link href="/dashboard" className="logo-link">
+          🌱 Glover Smart Farm
+        </Link>
       </div>
       <div className="menu">
         {navItems.map((item) => {
@@ -25,6 +27,8 @@ export default function Navbar() {
               key={item.path}
               href={item.path}
               className={`menu-item ${isActive ? 'active' : ''}`}
+              // 선택된 메뉴는 인라인 스타일로 100% 노란색이 되도록 강제 고정합니다.
+              style={isActive ? { color: '#facc15', borderColor: '#facc15', backgroundColor: 'rgba(250, 204, 21, 0.15)' } : {}}
             >
               {item.name}
             </Link>
@@ -41,7 +45,8 @@ export default function Navbar() {
           background-color: #0b1220;
           border-bottom: 2px solid #1f2937;
         }
-        .logo a {
+        /* a 태그 대신 클래스 이름을 직접 지정하여 색상 무시 현상 방지 */
+        .logo-link {
           color: #facc15; /* 눈에 띄는 밝은 노란색 */
           font-size: 1.5rem;
           font-weight: bold;
