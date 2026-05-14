@@ -131,12 +131,12 @@ export default function Dashboard() {
     setControl((prev) => {
       const next = !prev[key];
       if (clientRef.current && clientRef.current.connected) {
-        // ESP32 소스코드에 맞춘 JSON 명령어 전송
-        const command: any = { cmd_type: "manual", devices: { [key]: { on: next } } };
-        if (key === 'pump' && next) {
-          command.devices.pump.duration_sec = 10; // 펌프 10초 가동 후 자동 종료
-        }
+        // 직관적인 JSON 명령어 전송 ( {"device":"pump", "state":true} 형태 )
+        const command = { device: key, state: next };
+        console.log(`[MQTT 전송 완료] smartfarm/jeho123/control ->`, command);
         clientRef.current.publish('smartfarm/jeho123/control', JSON.stringify(command));
+      } else {
+        console.warn("MQTT 서버와 연결되지 않아 제어 명령을 보낼 수 없습니다.");
       }
       return { ...prev, [key]: next };
     });
