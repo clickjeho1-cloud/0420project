@@ -196,6 +196,30 @@ export default function Dashboard() {
 
       <WeatherWidget />
 
+      <div className="camera-panel">
+        <h2>📷 실시간 모니터링 영상</h2>
+        <div className="camera-grid">
+          <div className="camera-card">
+            <h3>내부 카메라 (ESP32-CAM)</h3>
+            <div className="video-wrapper">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="http://192.168.0.100:81/stream" alt="ESP32-CAM" />
+            </div>
+          </div>
+          <div className="camera-card">
+            <h3>참고 영상 (YouTube)</h3>
+            <div className="video-wrapper iframe-wrapper">
+              <iframe 
+                src="https://www.youtube.com/embed/b4nXr11Ja8o?list=RDb4nXr11Ja8o&autoplay=1&mute=1" 
+                frameBorder="0" 
+                allow="autoplay; encrypted-media" 
+                allowFullScreen
+              ></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="recommendation-panel">
         <h2>추천 제어값</h2>
         {recommendationLoading ? (
@@ -320,6 +344,15 @@ export default function Dashboard() {
         .weather-meta { color: #cbd5e1; display: flex; flex-direction: column; justify-content: space-between; }
         .weather-meta p { margin: 8px 0; font-size: 15px; }
         .weather-meta strong { color: #f8fafc; }
+        .camera-panel { background: #0b1220; padding: 18px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
+        .camera-panel h2 { margin-top: 0; color: #e2e8f0; font-size: 18px; }
+        .camera-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .camera-card { background: #111827; padding: 14px; border-radius: 10px; border: 1px solid #334155; }
+        .camera-card h3 { margin-top: 0; color: #cbd5e1; font-size: 15px; margin-bottom: 12px; text-align: center; }
+        .video-wrapper { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; }
+        .video-wrapper img { width: 100%; height: 100%; object-fit: contain; }
+        .iframe-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        @media (max-width: 768px) { .camera-grid { grid-template-columns: 1fr; } }
         .recommendation-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
         .recommendation-panel h2 { margin-top: 0; color: #94a3b8; margin-bottom: 12px; }
         .recommendation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
