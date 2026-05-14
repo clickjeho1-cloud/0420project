@@ -42,7 +42,7 @@ export default function Navbar() {
           border-bottom: 2px solid #1f2937;
         }
         .logo a {
-          color: #10b981;
+          color: #facc15; /* 눈에 띄는 밝은 노란색 */
           font-size: 1.5rem;
           font-weight: bold;
           text-decoration: none;
@@ -53,7 +53,7 @@ export default function Navbar() {
           justify-content: flex-end; /* 메뉴를 오른쪽으로 정렬 */
         }
         .menu-item {
-          color: #cbd5e1;
+          color: #f8fafc; /* 어두운 회색에서 가장 밝은 흰색으로 변경 */
           text-decoration: none;
           font-size: 1.1rem;
           font-weight: bold;

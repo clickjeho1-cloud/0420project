@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase 클라이언트 초기화 (API를 거치지 않고 DB에서 직접 가져오기 위함)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 type JournalImage = {
   id: string;
@@ -30,21 +36,28 @@ export default function JournalList() {
   useEffect(() => {
     async function fetchJournals() {
       try {
-        const res = await fetch('/api/journal', { cache: 'no-store' });
-        const data = await res.json();
-        
-        if (data.success) {
-          // 💡 서버에서 온 데이터가 배열이 아닌 경우 앱이 터지는 것(map error) 방지
-          const fetchedData = Array.isArray(data.data) ? data.data : (data.data ? [data.data] : []);
-          setJournals(fetchedData);
+        // API 오류를 우회하고 DB에서 직접 데이터와 사진을 확실하게 불러옵니다.
+        const { data, error: fetchError } = await supabase
+          .from('journals')
+          .select('*, journal_images(*)');
           
-          // 들어온 데이터 중 가장 최신 월(Month)을 기본 선택값으로 지정
-          const availableMonths = Array.from(new Set(fetchedData.filter((j: any) => j && j.date).map((j: any) => j.date.substring(0, 7)))).sort().reverse();
-          if (availableMonths.length > 0) {
-            setSelectedMonth(availableMonths[0] as string);
-          }
-        } else {
-          setError('데이터를 불러오는데 실패했습니다.');
+        if (fetchError) throw fetchError;
+
+        const mappedData = (data || []).map((row: any) => ({
+          id: row.id,
+          date: row.date,
+          height: row.height,
+          leafSize: row.leaf_size,
+          waterAmount: row.water_amount,
+          notes: row.notes,
+          photos: row.photos,
+          journal_images: row.journal_images
+        }));
+
+        setJournals(mappedData);
+        const availableMonths = Array.from(new Set(mappedData.filter((j: any) => j && j.date).map((j: any) => j.date.substring(0, 7)))).sort().reverse();
+        if (availableMonths.length > 0) {
+          setSelectedMonth(availableMonths[0] as string);
         }
       } catch (err) {
         setError('서버와 통신 중 오류가 발생했습니다.');
