@@ -306,8 +306,8 @@ export default function Dashboard() {
         .scada { background: #05070f; color: white; min-height: 100vh; padding: 24px; font-size: 18px; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f2937; margin-bottom: 16px; }
         .nav-links { display: flex; gap: 16px; }
-        .nav-link { color: #2563eb; text-decoration: none; font-weight: bold; }
-        .nav-link:hover { color: #1d4ed8; }
+        .nav-link { color: #facc15; text-decoration: none; font-weight: bold; }
+        .nav-link:hover { color: #fef08a; }
         .weather-panel { background: #0b1220; padding: 18px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
         .weather-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
         .weather-panel h3 { margin: 0; color: #e2e8f0; font-size: 18px; }
