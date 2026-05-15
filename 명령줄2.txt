@@ -1,0 +1,11 @@
+sudo nmcli connection add type wifi con-name "New_WiFi" ifname wlan0 ssid "sfarm_2.4g" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "ds123456"
+
+sudo nmcli connection add type wifi con-name "External_WiFi" ifname wlan0 ssid "Farm_2.4G" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "20240603"
+
+git add .
+git commit -m "수정 내용 메모 작성"
+
+git add .
+git push origin main
+
+git push

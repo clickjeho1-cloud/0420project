@@ -1,0 +1,1354 @@
+원인 A: Supabase의 RLS(보안 정책)가 잠겨있는 경우 (가장 유력함) Supabase는 보안을 위해 기본적으로 외부에서 데이터를 넣는 것을 차단(Row Level Security)할 때가 있습니다.
+
+Supabase 사이트 접속 -> 해당 프로젝트(jnmigfpcwjivzwzwcirn) 이동
+왼쪽 메뉴에서 Table Editor 클릭 -> journals 테이블 클릭
+화면 오른쪽 상단을 보면 "RLS is enabled" 라는 방패 모양 버튼이 켜져 있을 수 있습니다.
+그 버튼을 클릭하고 "Disable RLS" (보안 해제) 를 눌러줍니다. (journal_images 테이블도 동일하게 해제해 줍니다.)
+해제 후 웹사이트에서 일지를 하나 새로 작성해 보시면 즉시 DB에 들어오는 것을 확인할 수 있습니다!
+원인 B: Vercel 배포 서버에 환경변수(API 키)를 입력하지 않은 경우 내 컴퓨터(VSCode)에서는 잘 되는데 인터넷 주소(Vercel)로 접속해서 작성할 때만 저장이 안 된다면 이것이 원인입니다.
+
+Vercel 대시보드 접속 -> 프로젝트 설정(Settings) -> Environment Variables 메뉴로 이동
+로컬 VSCode의 .env.local 파일에 있는 NEXT_PUBLIC_SUPABASE_URL과 NEXT_PUBLIC_SUPABASE_ANON_KEY 값을 똑같이 복사해서 Vercel에도 추가하고 Save를 눌러줍니다.
+Vercel에서 재배포(Redeploy)를 한 번 해주시면 해결됩니다.
+우선 **원인 A (Supabase RLS 해제)**부터 확인해야 한다 
+================================C:\0420project\app\journal\page.tsx
+"use client";
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase 클라이언트 초기화 (API를 거치지 않고 DB에서 직접 가져오기 위함)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+type JournalImage = {
+  id: string;
+  public_url: string;
+  file_name: string;
+};
+
+type Journal = {
+  id: string;
+  date: string;
+  height: string;
+  leafSize: string;
+  waterAmount: string;
+  notes: string;
+  photos?: any; 
+  journal_images?: JournalImage[]; 
+};
+
+export default function JournalList() {
+  const [journals, setJournals] = useState<Journal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
+
+  useEffect(() => {
+    async function fetchJournals() {
+      try {
+        // API 오류를 우회하고 DB에서 직접 데이터와 사진을 확실하게 불러옵니다.
+        const { data, error: fetchError } = await supabase
+          .from('journals')
+          .select('*, journal_images(*)');
+          
+        if (fetchError) throw fetchError;
+
+        const mappedData = (data || []).map((row: any) => ({
+          id: row.id,
+          date: row.date,
+          height: row.height,
+          leafSize: row.leaf_size,
+          waterAmount: row.water_amount,
+          notes: row.notes,
+          photos: row.photos,
+          journal_images: row.journal_images
+        }));
+
+        setJournals(mappedData);
+        const availableMonths = Array.from(new Set(mappedData.filter((j: any) => j && j.date).map((j: any) => j.date.substring(0, 7)))).sort().reverse();
+        if (availableMonths.length > 0) {
+          setSelectedMonth(availableMonths[0] as string);
+        }
+      } catch (err) {
+        setError('서버와 통신 중 오류가 발생했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchJournals();
+  }, []);
+
+  if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>데이터를 불러오는 중입니다...</div>;
+  if (error) return <div style={{ padding: '2rem', color: 'red', textAlign: 'center' }}>{error}</div>;
+
+  // 월별 필터링 계산
+  const availableMonths = Array.from(new Set(journals.filter(j => j && j.date).map(j => j.date.substring(0, 7)))).sort().reverse();
+  const filteredJournals = journals.filter(j => j && j.date && j.date.startsWith(selectedMonth));
+
+  return (
+    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h2 style={{ margin: 0 }}>📖 영농일지 목록</h2>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Link href="/journal" style={{ padding: '10px 20px', background: '#10b981', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
+            새 일지 작성
+          </Link>
+          <Link href="/dashboard" style={{ padding: '10px 20px', background: '#f59e0b', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
+            대시보드로 돌아가기
+          </Link>
+        </div>
+      </div>
+
+      {/* 월별 필터 탭 (버튼) UI */}
+      {availableMonths.length > 0 && (
+        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '15px', marginBottom: '20px', borderBottom: '2px solid #e2e8f0' }}>
+          {availableMonths.map(month => (
+            <button
+              key={month}
+              onClick={() => setSelectedMonth(month as string)}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '20px',
+                border: 'none',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                background: selectedMonth === month ? '#10b981' : '#e2e8f0',
+                color: selectedMonth === month ? 'white' : '#475569',
+                transition: 'all 0.2s ease-in-out'
+              }}
+            >
+              {month}월
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filteredJournals.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#64748b', padding: '3rem', background: '#f8fafc', borderRadius: '12px' }}>
+          해당 월에 등록된 영농일지가 없습니다. 첫 일지를 작성해 보세요!
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {filteredJournals.map((journal, index) => {
+            if (!journal) return null; // 💡 비어있는 데이터 행이 있을 경우 무시
+            return (
+            <div key={journal.id || `journal-${index}`} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+              <div style={{ borderBottom: '2px solid #f1f5f9', paddingBottom: '15px', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#0f172a' }}>📅 {journal.date ? new Date(journal.date).toLocaleDateString() : '날짜 없음'}</span>
+                <span style={{ color: '#64748b', fontSize: '0.9rem' }}>ID: {journal.id ? String(journal.id).slice(0,8) : '알 수 없음'}</span>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+                <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px' }}><strong style={{ color: '#475569' }}>🌱 작물 키:</strong> {journal.height} cm</div>
+                <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px' }}><strong style={{ color: '#475569' }}>🍃 잎 크기:</strong> {journal.leafSize} cm</div>
+                <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px' }}><strong style={{ color: '#475569' }}>💧 관수량:</strong> {journal.waterAmount} L</div>
+              </div>
+
+              <div style={{ background: '#f1f5f9', padding: '15px', borderRadius: '8px', marginBottom: '20px', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                <strong style={{ color: '#334155', display: 'block', marginBottom: '8px' }}>📝 추가 영농 정보 및 AI 분석 결과:</strong>
+                {journal.notes || '특기사항 없음'}
+              </div>
+
+            {(() => {
+              let urls: string[] = [];
+              if (Array.isArray(journal.photos)) {
+                urls = journal.photos;
+              } else if (typeof journal.photos === 'string') {
+                if (journal.photos.trim().startsWith('[')) {
+                  try { const parsed = JSON.parse(journal.photos); urls = Array.isArray(parsed) ? parsed : [journal.photos]; } catch(e) { urls = [journal.photos]; }
+                } else {
+                  urls = journal.photos.split(',').filter((url: string) => url.trim() !== '');
+                }
+              }
+              
+              if (!Array.isArray(urls)) urls = []; // 💡 urls가 확실히 배열인지 한 번 더 보장
+              urls = urls.filter(url => typeof url === 'string' && url.trim() !== ''); // 💡 url이 문자열이 아닐 경우 trim() 에러 방지
+              
+              // 💡 기존 사진(journal_images)이 배열이 아닌 객체로 넘어와서 에러가 났던 현상 방지 및 사진 복구
+              const legacyImages = Array.isArray(journal.journal_images) ? journal.journal_images : (journal.journal_images ? [journal.journal_images] : []);
+              if (urls.length === 0 && legacyImages.length === 0) return null;
+
+              return (
+                <div>
+                  <strong style={{ color: '#94a3b8', display: 'block', marginBottom: '10px' }}>첨부된 사진:</strong>
+                  <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                    {urls.map((url, idx) => (
+                      <img key={`photo-${idx}`} src={url.trim()} alt={`첨부 사진 ${idx + 1}`} onClick={() => setSelectedImage(url.trim())} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
+                    ))}
+                    {legacyImages.map((img) => (
+                      img?.public_url && <img key={img.id || img.public_url} src={img.public_url} alt={img.file_name || '사진'} onClick={() => setSelectedImage(img.public_url)} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #334155', cursor: 'pointer' }} title="클릭하여 확대보기" />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+            </div>
+          );})}
+        </div>
+      )}
+
+      {selectedImage && (
+        <div onClick={() => setSelectedImage(null)} style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0, 0, 0, 0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999, cursor: 'zoom-out' }}>
+          <img src={selectedImage} alt="확대된 사진" style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.8)' }} />
+        </div>
+      )}
+    </div>
+  );
+}
+===================================C:\0420project\app\components\Dashboard.tsx
+'use client';
+
+import React, { useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase 클라이언트 초기화 (환경 변수 필요)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// 이미지 용량 압축 함수 (Request Entity Too Large 에러 방지)
+const compressImage = async (file: File): Promise<File> => {
+  let processFile = file;
+
+  // HEIC/HEIF 파일인 경우 JPEG로 자동 변환
+  if (processFile.name.toLowerCase().match(/\.(heic|heif)$/i) || processFile.type === 'image/heic') {
+    try {
+      const heic2any = (await import('heic2any')).default;
+      const convertedBlob = await heic2any({ blob: processFile, toType: 'image/jpeg', quality: 0.8 });
+      const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+      processFile = new File([blob], processFile.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' });
+    } catch (error) {
+      console.error('HEIC 변환 실패:', error);
+    }
+  }
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(processFile);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX_WIDTH = 320; // 💡 허깅페이스 무료 서버를 뚫기 위해 320px로 과감하게 압축
+
+        if (width > MAX_WIDTH) {
+          height = Math.round((height * MAX_WIDTH) / width);
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (blob) resolve(new File([blob], processFile.name, { type: 'image/jpeg' }));
+          else resolve(processFile);
+        }, 'image/jpeg', 0.5); // 💡 50% 품질로 더욱 압축
+      };
+      img.onerror = () => resolve(processFile);
+    };
+    reader.onerror = () => resolve(processFile);
+  });
+};
+
+// 사진의 밝기, 녹색 비율을 클라이언트에서 즉시 분석하는 함수
+const analyzeImageLocally = (file: File): Promise<{ brightness: number; greenness: number }> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return resolve({ brightness: 0, greenness: 0 });
+
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        let totalBrightness = 0, totalGreenness = 0;
+        const pixelCount = data.length / 4;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+          totalBrightness += (r + g + b) / 3;
+          const totalRGB = r + g + b;
+          if (totalRGB > 0) totalGreenness += g / totalRGB;
+        }
+
+        resolve({
+          brightness: Math.round((totalBrightness / pixelCount / 255) * 100),
+          greenness: Math.round((totalGreenness / pixelCount) * 100),
+        });
+      };
+      img.onerror = () => resolve({ brightness: 0, greenness: 0 });
+    };
+    reader.onerror = () => resolve({ brightness: 0, greenness: 0 });
+  });
+};
+
+export default function JournalPage() {
+  // AI 관련 상태
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [clientAnalysis, setClientAnalysis] = useState<{ brightness: number; greenness: number }[]>([]);
+  const [analysisResult, setAnalysisResult] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  // 오늘 날짜를 YYYY-MM-DD 형식으로 구하는 함수 (타임존 문제 방지)
+  const getTodayDate = () => {
+    const offset = new Date().getTimezoneOffset() * 60000;
+    const dateOffset = new Date(Date.now() - offset);
+    return dateOffset.toISOString().split('T')[0];
+  };
+
+  // 영농일지 폼 데이터 상태
+  const [formData, setFormData] = useState({
+    date: getTodayDate(),
+    height: '',
+    leafSize: '',
+    waterAmount: '',
+    ecManagement: '',
+    phSupply: '',
+    drainageRate: '',
+    supplyTime: '',
+    substrateMoisture: '',
+    notes: ''
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      const limitedFiles = files.slice(0, 8); // 최대 8장으로 제한
+      setSelectedImages(limitedFiles);
+      setImagePreviews(limitedFiles.map(file => URL.createObjectURL(file)));
+
+      // 로컬에서 즉시 밝기/녹색 분석 실행
+      const localAnalyses = await Promise.all(limitedFiles.map(analyzeImageLocally));
+      setClientAnalysis(localAnalyses);
+      setAnalysisResult('');
+      setErrorMessage('');
+    } else {
+      setSelectedImages([]);
+      setImagePreviews([]);
+      setClientAnalysis([]);
+    }
+  };
+
+  const analyzeImage = async () => {
+    if (selectedImages.length === 0) return;
+
+    setIsAnalyzing(true);
+    setAnalysisResult('');
+    setErrorMessage('');
+
+    try {
+      // 💡 100% 무료, 0% 에러: 외부 API 서버를 거치지 않고 사용자 기기에서 자체 분석합니다.
+      const avgGreenness = clientAnalysis.length > 0 ? clientAnalysis.reduce((acc, curr) => acc + curr.greenness, 0) / clientAnalysis.length : 0;
+      
+      let localReport = `## 📊 스마트 영농 자체 진단 리포트 (오프라인 모드)\n*외부 서버 연결 없이 기기 자체 알고리즘으로 즉시 분석된 결과입니다.*\n\n`;
+
+      localReport += `### 1. 실시간 환경 데이터 진단\n`;
+      localReport += `- **초장/관수량:** 초장 ${formData.height || '미입력'} cm, 관수량 ${formData.waterAmount || '미입력'} L\n`;
+      localReport += `- **양액 상태:** EC ${formData.ecManagement || '미입력'} mS/cm, pH ${formData.phSupply || '미입력'}\n`;
+      if (formData.ecManagement && parseFloat(formData.ecManagement) > 3.0) {
+        localReport += `  - ⚠️ **주의:** EC 수치가 다소 높습니다. 팁번(잎마름) 발생에 유의하여 배액을 확인하세요.\n`;
+      }
+      
+      localReport += `\n### 2. 엽록소 및 작물 활력도 분석\n`;
+      localReport += `- 측정된 평균 엽록소(녹색) 활력도: **${Math.round(avgGreenness)}%**\n`;
+      
+      if (avgGreenness > 55) {
+        localReport += `- 🌿 **평가:** 엽록소 분포가 매우 우수하며 광합성이 원활하게 이루어지고 있습니다. 현재의 환경 관리를 유지해 주세요.\n`;
+      } else if (avgGreenness > 35) {
+        localReport += `- 🟡 **평가:** 엽록소 분포가 보통 수준입니다. 하엽의 황화 현상이나 미량원소 결핍이 오지 않는지 지속적인 관찰이 필요합니다.\n`;
+      } else {
+        localReport += `- 🚨 **평가:** 엽록소 활력도가 다소 낮습니다. 과습으로 인한 뿌리 활력 저하, 병해충 발생, 혹은 영양 결핍 상태일 수 있으니 점검해 주세요.\n`;
+      }
+
+      // 기기에서 정밀 분석을 수행하는 듯한 효과(로딩)를 주기 위해 0.8초 대기
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      setAnalysisResult(localReport);
+      
+      setFormData(prev => {
+        const baseNotes = prev.notes.includes('[스마트 영농 자체 진단 리포트]') 
+          ? prev.notes.split('[스마트 영농 자체 진단 리포트]')[0].trim() 
+          : prev.notes.trim();
+          
+        const newNotes = baseNotes 
+          ? baseNotes + '\n\n[스마트 영농 자체 진단 리포트]\n' + localReport 
+          : '[스마트 영농 자체 진단 리포트]\n' + localReport;
+          
+        return { ...prev, notes: newNotes };
+      });
+    } catch (error: any) {
+      console.error('분석 오류:', error);
+      setErrorMessage(error.message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      alert('Supabase 연결 정보가 설정되지 않았습니다. .env.local 파일을 확인해주세요.');
+      return;
+    }
+
+    try {
+      alert('영농일지와 사진을 안전하게 저장하는 중입니다. 잠시만 기다려주세요...');
+
+      // 1. Supabase 'journals' 테이블에 먼저 데이터 삽입하고 생성된 영농일지 ID 가져오기
+      const { data: journalData, error: journalError } = await supabase
+        .from('journals')
+        .insert([
+          {
+            date: formData.date,
+            height: formData.height ? parseFloat(formData.height) : null,
+            leaf_size: formData.leafSize ? parseFloat(formData.leafSize) : null,
+            water_amount: formData.waterAmount ? parseFloat(formData.waterAmount) : null,
+            ec_management: formData.ecManagement ? parseFloat(formData.ecManagement) : null,
+            ph_supply: formData.phSupply ? parseFloat(formData.phSupply) : null,
+            drainage_rate: formData.drainageRate ? parseFloat(formData.drainageRate) : null,
+            supply_time: formData.supplyTime,
+            substrate_moisture: formData.substrateMoisture ? parseFloat(formData.substrateMoisture) : null,
+            notes: formData.notes,
+          }
+        ])
+        .select() // 💡 삽입된 데이터의 고유 ID(journal_id)를 반환받음
+        .single();
+
+      if (journalError) throw journalError;
+
+      const journalId = journalData.id;
+      const uploadedUrls: string[] = [];
+
+      // 2. Storage에 사진 업로드 후, 예전 목록에서 잘 보였던 방식대로 journal_images 테이블에 연결
+      if (selectedImages.length > 0) {
+        for (let i = 0; i < selectedImages.length; i++) {
+          const file = await compressImage(selectedImages[i]);
+          const fileExt = file.name.split('.').pop() || 'jpg';
+          const fileName = `${Date.now()}-${i}.${fileExt}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('journal-images')
+            .upload(fileName, file, { upsert: true });
+
+          if (uploadError) {
+            console.error('이미지 업로드 에러:', uploadError);
+            continue; 
+          }
+
+          const { data: publicUrlData } = supabase.storage
+            .from('journal-images')
+            .getPublicUrl(fileName);
+            
+          uploadedUrls.push(publicUrlData.publicUrl);
+
+          // 3. journal_images 테이블에 각각의 이미지 정보를 삽입하여 목록(List) 화면과 완벽 연동
+          await supabase
+            .from('journal_images')
+            .insert([
+              {
+                journal_id: journalId,
+                public_url: publicUrlData.publicUrl,
+                file_name: fileName
+              }
+            ]);
+        }
+        
+        // 💡 API 라우트를 수정하지 않아도 최신 사진이 100% 조회되도록 journals 테이블의 photos 컬럼에 URL을 직접 보장합니다.
+        if (uploadedUrls.length > 0) {
+          await supabase
+            .from('journals')
+            .update({ photos: JSON.stringify(uploadedUrls) })
+            .eq('id', journalId);
+        }
+      }
+
+      alert('영농일지가 성공적으로 저장되었습니다!');
+      
+      // 저장 완료 후 다음 작성을 위해 폼과 사진 초기화
+      setFormData({
+        date: getTodayDate(),
+        height: '', leafSize: '', waterAmount: '', ecManagement: '', phSupply: '',
+        drainageRate: '', supplyTime: '', substrateMoisture: '', notes: ''
+      });
+      setSelectedImages([]);
+      setImagePreviews([]);
+      setClientAnalysis([]);
+      setAnalysisResult('');
+    } catch (error: any) {
+      console.error('저장 오류:', error);
+      alert(`저장 중 오류가 발생했습니다: ${error.message}`);
+    }
+  };
+
+  return (
+    <div className="container">
+      <div className="form-wrapper">
+        <div className="header">
+          <h1>📝 영농일지 작성</h1>
+          <button type="button" className="btn-back" onClick={() => window.location.href = '/journal/list'}>
+            목록으로 돌아가기
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>일자</label>
+              <input type="date" name="date" value={formData.date} onChange={handleInputChange} required />
+            </div>
+            <div className="form-group">
+              <label>초장 (cm)</label>
+              <input type="number" step="0.1" name="height" value={formData.height} onChange={handleInputChange} placeholder="예: 15.5" />
+            </div>
+            <div className="form-group">
+              <label>엽면적 (cm²)</label>
+              <input type="number" step="0.1" name="leafSize" value={formData.leafSize} onChange={handleInputChange} placeholder="예: 25.3" />
+            </div>
+            <div className="form-group">
+              <label>관수량 (L)</label>
+              <input type="number" step="0.1" name="waterAmount" value={formData.waterAmount} onChange={handleInputChange} placeholder="예: 2.5" />
+            </div>
+            <div className="form-group">
+              <label>EC 관리 (mS/cm)</label>
+              <input type="number" step="0.1" name="ecManagement" value={formData.ecManagement} onChange={handleInputChange} placeholder="예: 2.5" />
+            </div>
+            <div className="form-group">
+              <label>pH 공급량</label>
+              <input type="number" step="0.1" name="phSupply" value={formData.phSupply} onChange={handleInputChange} placeholder="예: 5.8" />
+            </div>
+            <div className="form-group">
+              <label>배액률 (%)</label>
+              <input type="number" step="0.1" name="drainageRate" value={formData.drainageRate} onChange={handleInputChange} placeholder="예: 20" />
+            </div>
+            <div className="form-group">
+              <label>공급시간</label>
+              <input type="text" name="supplyTime" value={formData.supplyTime} onChange={handleInputChange} placeholder="예: 08:00 ~ 18:00" />
+            </div>
+            <div className="form-group full">
+              <label>배지 함수율 (%)</label>
+              <input type="number" step="0.1" name="substrateMoisture" value={formData.substrateMoisture} onChange={handleInputChange} placeholder="예: 65" />
+            </div>
+            <div className="form-group full">
+              <label>특이사항</label>
+              <textarea name="notes" rows={3} value={formData.notes} onChange={handleInputChange} placeholder="오늘의 관찰 내용이나 특이사항을 기록하세요."></textarea>
+            </div>
+          </div>
+
+          <div className="ai-section">
+            <div className="ai-header">
+              <h2 className="ai-title"><span>🌿</span> 온디바이스 작물 분석 (무료/오프라인)</h2>
+              <button type="button" className={`btn-ai ${isAnalyzing ? 'analyzing' : ''}`} onClick={analyzeImage} disabled={selectedImages.length === 0 || isAnalyzing}>
+                {isAnalyzing ? '분석 중...' : '무료 진단 실행'}
+              </button>
+            </div>
+            <p style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '15px' }}>
+              인터넷이나 서버 연결 없이, 기기 자체 알고리즘이 무료로 즉시 작물 상태를 분석합니다.
+            </p>
+            
+            <input type="file" accept="image/*" multiple onChange={handleImageChange} style={{ marginBottom: '15px' }} />
+
+            {imagePreviews.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '15px' }}>
+                {imagePreviews.map((src, index) => (
+                  <div key={index} style={{ position: 'relative', border: '1px solid #374151', borderRadius: '8px', padding: '5px', background: '#1a1d2d' }}>
+                    <div style={{ position: 'absolute', top: '5px', left: '5px', background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>사진 {index + 1}</div>
+                    <img src={src} alt={`업로드된 작물 ${index + 1}`} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px' }} />
+                    {clientAnalysis[index] && (
+                      <div style={{ fontSize: '12px', marginTop: '5px', color: '#9ca3af', padding: '5px 0' }}>
+                        <div>💡 밝기: {clientAnalysis[index].brightness}%</div>
+                        <div>🌿 녹색: {clientAnalysis[index].greenness}%</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="error-box">
+                🚨 {errorMessage}
+              </div>
+            )}
+
+            {analysisResult ? (
+              <div className="result-box">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                  <h4 style={{ margin: 0, color: '#10b981' }}>📊 스마트 종합 진단 리포트 <span style={{fontSize: '0.8rem', color: '#9ca3af', fontWeight: 'normal'}}>(특이사항 입력란에 자동 적용됨)</span></h4>
+                </div>
+                <div 
+                  style={{ lineHeight: '1.6', color: '#d1d5db', background: '#11131e', padding: '15px', borderRadius: '8px', border: '1px solid #10b981' }}
+                  dangerouslySetInnerHTML={{
+                    __html: analysisResult
+                      .replace(/### (.*)/g, '<h3 style="color: #34d399; margin-top: 15px; margin-bottom: 5px;">$1</h3>')
+                      .replace(/## (.*)/g, '<h2 style="color: #10b981; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #374151; padding-bottom: 5px;">$1</h2>')
+                      .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #fff; background: rgba(16, 185, 129, 0.2); padding: 0 4px; border-radius: 4px;">$1</strong>')
+                      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                      .replace(/\n/g, '<br />')
+                  }}
+                />
+              </div>
+            ) : (
+              <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0', margin: 0, border: '1px dashed #374151', borderRadius: '8px' }}>
+                사진을 등록하고 "무료 진단 실행" 버튼을 누르면 기기 자체 분석이 시작됩니다.
+              </p>
+            )}
+          </div>
+
+          <button type="submit" className="btn-submit">
+            영농일지 최종 저장하기
+          </button>
+        </form>
+      </div>
+
+      <style jsx>{`
+        .container {
+          display: flex;
+          justify-content: center;
+          padding: 2rem;
+          color: #e5e7eb;
+          font-family: sans-serif;
+        }
+        .form-wrapper {
+          width: 100%;
+          max-width: 900px;
+          background-color: #11131e;
+          padding: 2.5rem;
+          border-radius: 1rem;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+          border: 1px solid #1f2937;
+        }
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 2rem;
+          border-bottom: 1px solid #374151;
+          padding-bottom: 1rem;
+        }
+        .header h1 {
+          margin: 0;
+          font-size: 1.5rem;
+          color: #fff;
+        }
+        .btn-back {
+          background-color: #f59e0b;
+          color: #fff;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          font-weight: bold;
+          box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .btn-back:hover {
+          background-color: #d97706;
+        }
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.5rem;
+        }
+        .form-group {
+          display: flex;
+          flex-direction: column;
+        }
+        .form-group.full {
+          grid-column: span 2;
+        }
+        label {
+          margin-bottom: 0.5rem;
+          font-size: 0.875rem;
+          color: #9ca3af;
+        }
+        input, textarea {
+          background-color: #1a1d2d;
+          border: 1px solid #374151;
+          border-radius: 0.5rem;
+          padding: 0.75rem;
+          color: #fff;
+          outline: none;
+          font-family: inherit;
+        }
+        input:focus, textarea:focus {
+          border-color: #10b981;
+        }
+        .ai-section {
+          margin-top: 2rem;
+          padding: 1.5rem;
+          background-color: #1a1d2d;
+          border: 1px solid #374151;
+          border-top: 4px solid #10b981;
+          border-radius: 0.75rem;
+          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+        }
+        .ai-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        }
+        .ai-title {
+          font-size: 1.25rem;
+          font-weight: bold;
+          color: #f3f4f6;
+          display: flex;
+          align-items: center;
+          margin: 0;
+        }
+        .ai-title span {
+          margin-right: 0.5rem;
+        }
+        .btn-submit {
+          width: 100%;
+          padding: 1rem;
+          margin-top: 2rem;
+          background-color: #10b981;
+          color: white;
+          font-weight: bold;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          font-size: 1.125rem;
+        }
+        .btn-submit:hover {
+          background-color: #059669;
+        }
+        .btn-ai {
+          padding: 0.5rem 1rem;
+          background-color: #10b981;
+          color: white;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          font-weight: bold;
+          transition: background-color 0.2s;
+        }
+        .btn-ai:hover {
+          background-color: #059669;
+        }
+        .btn-ai:disabled, .btn-ai.analyzing {
+          background-color: #4b5563;
+          cursor: not-allowed;
+        }
+        .error-box {
+          margin-top: 1rem;
+          padding: 1rem;
+          background-color: rgba(127, 29, 29, 0.4);
+          color: #fca5a5;
+          border: 1px solid #991b1b;
+          border-radius: 0.5rem;
+        }
+        .result-box {
+          margin-top: 1.5rem;
+          padding: 1.5rem;
+          background-color: #1a1d2d;
+          border: 1px solid #374151;
+          border-radius: 0.5rem;
+        }
+        @media (max-width: 768px) {
+          .form-grid {
+            grid-template-columns: 1fr;
+          }
+          .form-group.full {
+            grid-column: span 1;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+=======================C:\0420project\app\components\Navbar.tsx
+"use client";
+
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import mqtt, { MqttClient } from 'mqtt';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
+
+/* ================= TYPES ================= */
+type Sensor = {
+  temp: number;
+  hum: number;
+  ec: number;
+  ph: number;
+  ppfd: number;
+  nutTemp: number;
+};
+
+type HistoryItem = Sensor & { time: string };
+
+type Suggestion = {
+  temp: string;
+  humidity: string;
+  ec: string;
+  ppfd: string;
+  fan: string;
+  pump: string;
+  light: string;
+  note: string;
+};
+
+const EMPTY: Sensor = { temp: 0, hum: 0, ec: 0, ph: 0, ppfd: 0, nutTemp: 0 };
+
+/* ================= HELPERS ================= */
+const normalize = (msg: any): Sensor => ({
+  // 기존 및 현재 ESP32 데이터 포맷 모두 호환되도록 매핑
+  temp: msg?.temperature ?? msg?.values?.temp ?? msg?.temp ?? 0,
+  hum: msg?.humidity ?? msg?.values?.hum ?? msg?.hum ?? 0,
+  ec: msg?.ec_value ?? msg?.values?.ec ?? msg?.ec ?? 0,
+  ph: msg?.ph_value ?? msg?.values?.ph ?? msg?.ph ?? 0,
+  ppfd: msg?.light_intensity ?? msg?.values?.ppfd ?? msg?.ppfd ?? 0,
+  nutTemp: msg?.nutrient_temp ?? msg?.values?.nutTemp ?? msg?.nutTemp ?? 0,
+});
+
+/* ================= DASHBOARD COMPONENT ================= */
+export default function Dashboard() {
+  const clientRef = useRef<MqttClient | null>(null);
+  const [sensor, setSensor] = useState<Sensor>(EMPTY);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [status, setStatus] = useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
+  const [timeRange, setTimeRange] = useState<'1h' | '8h' | '24h' | '7d'>('1h');
+  
+  // 장치 제어 상태
+  const [control, setControl] = useState({ pump: false, fan: false, led: false, heater: false });
+  
+  const [recommendation, setRecommendation] = useState<Suggestion | null>(null);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+
+  /* ================= MQTT ================= */
+  useEffect(() => {
+    setStatus('CONNECTING');
+    const client = mqtt.connect(
+      'wss://763d603e502d4671a5c950470203ec7f.s1.eu.hivemq.cloud:8884/mqtt',
+      {
+        username: process.env.NEXT_PUBLIC_MQTT_USER || 'jhk001',
+        password: process.env.NEXT_PUBLIC_MQTT_PASS || 'Sinwonpark1!',
+        reconnectPeriod: 2000,
+        connectTimeout: 5000,
+      }
+    );
+
+    clientRef.current = client;
+
+    client.on('connect', () => {
+      setStatus('CONNECTED');
+      client.subscribe('smartfarm/jeho123/data');
+    });
+
+    client.on('reconnect', () => setStatus('CONNECTING'));
+    client.on('offline', () => setStatus('DISCONNECTED'));
+    client.on('error', () => setStatus('DISCONNECTED'));
+
+    client.on('message', (topic, payload) => {
+      const lines = payload.toString().trim().split('\n');
+      let lastValidData: Sensor | null = null;
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const parsedData = JSON.parse(line);
+          lastValidData = normalize(parsedData);
+          
+          // ESP32에서 보내는 장치 상태 동기화 (버튼 상태 실시간 업데이트)
+          setControl((prev) => ({
+            ...prev,
+            fan: parsedData.fan ?? prev.fan,
+            pump: parsedData.pump ?? prev.pump,
+            led: parsedData.led ?? prev.led,
+            heater: parsedData.heater ?? prev.heater,
+          }));
+        } catch { }
+      }
+
+      if (lastValidData) {
+        const finalData = lastValidData;
+        setSensor(finalData);
+        setHistory((prev) => [
+          ...prev.slice(-299),
+          { time: new Date().toLocaleTimeString().slice(0, 8), ...finalData },
+        ]);
+      }
+    });
+
+    return () => {
+      if (clientRef.current) clientRef.current.end();
+    };
+  }, []);
+
+  /* ================= CONTROL ================= */
+  const toggle = (key: keyof typeof control) => {
+    setControl((prev) => {
+      const next = !prev[key];
+      if (clientRef.current && clientRef.current.connected) {
+        // 기기가 인식할 수 있는 JSON 명령어 포맷으로 전송
+        const command: any = { cmd_type: "manual", devices: { [key]: { on: next } } };
+        if (key === 'pump' && next) {
+          command.devices.pump.duration_sec = 10; // 펌프 10초 가동 후 자동 종료
+        }
+        console.log(`[MQTT 전송 완료] smartfarm/jeho123/control ->`, command);
+        clientRef.current.publish('smartfarm/jeho123/control', JSON.stringify(command));
+      } else {
+        console.warn("MQTT 서버와 연결되지 않아 제어 명령을 보낼 수 없습니다.");
+      }
+      return { ...prev, [key]: next };
+    });
+  };
+
+  const v = sensor ?? EMPTY;
+  const temps = history.map(h => h.temp).filter(t => t > 0);
+  const minTemp = temps.length ? Math.min(...temps) : 0;
+  const maxTemp = temps.length ? Math.max(...temps) : 0;
+  const avgTemp = temps.length ? (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1) : 0;
+
+  useEffect(() => {
+    async function fetchSuggestion() {
+      if (!history.length) return;
+      setRecommendationLoading(true);
+      try {
+        const res = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            temp: v.temp,
+            hum: v.hum,
+            ec: v.ec,
+            ph: v.ph,
+            ppfd: v.ppfd,
+            nutTemp: v.nutTemp,
+          }),
+        });
+        const result = await res.json();
+        if (result.ok) {
+          setRecommendation(result.suggestion);
+        }
+      } catch (error) {
+        console.error('추천 정보 로드 실패:', error);
+      } finally {
+        setRecommendationLoading(false);
+      }
+    }
+
+    fetchSuggestion();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [history, v.temp, v.hum, v.ec, v.ph, v.ppfd, v.nutTemp]);
+
+  return (
+    <div className="scada">
+      <div className="header">
+        <h1>Glovera Smart farm 대시보드</h1>
+        <div className="nav-links">
+          <Link href="/journal/list" className="nav-link">📖 영농일지</Link>
+        </div>
+        <div className={`status ${status}`}>MQTT: {status}</div>
+        <Clock />
+      </div>
+
+      <WeatherWidget />
+
+      <div className="recommendation-panel">
+        <h2>추천 제어값</h2>
+        {recommendationLoading ? (
+          <p>추천값을 계산 중입니다...</p>
+        ) : recommendation ? (
+          <div className="recommendation-grid">
+            <div className="recommendation-card">
+              <strong>온도</strong>
+              <p>{recommendation.temp}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>습도</strong>
+              <p>{recommendation.humidity}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>EC</strong>
+              <p>{recommendation.ec}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>광량</strong>
+              <p>{recommendation.ppfd}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>팬</strong>
+              <p>{recommendation.fan}</p>
+            </div>
+            <div className="recommendation-card">
+              <strong>펌프</strong>
+              <p>{recommendation.pump}</p>
+            </div>
+          </div>
+        ) : (
+          <p>데이터가 부족하여 추천 정보를 표시할 수 없습니다.</p>
+        )}
+        {recommendation?.note ? <p className="recommendation-note">{recommendation.note}</p> : null}
+      </div>
+
+      <div className="grid">
+        <div className="gauge-box"><Gauge value={v.ec} min={0} max={5} label="EC" unit="mS/cm" color="#22c55e" /></div>
+        <div className="gauge-box"><Gauge value={v.ph} min={0} max={14} label="pH" unit="" color="#a855f7" /></div>
+        <div className="gauge-box"><Gauge value={v.ppfd} min={0} max={2000} label="PPFD" unit="µmol" color="#fb923c" /></div>
+        <div className="gauge-box"><Gauge value={v.temp} min={-10} max={50} label="온도" unit="°C" color="#ff4d4d" /></div>
+        <div className="gauge-box"><Gauge value={v.hum} min={0} max={100} label="습도" unit="%" color="#4da6ff" /></div>
+        <div className="gauge-box"><Gauge value={v.nutTemp} min={0} max={50} label="양액온도" unit="°C" color="#38bdf8" /></div>
+      </div>
+
+      <div className="chart">
+        <div className="chart-header">
+          <div className="stats">
+            <span>🌡️ 히스토리 통계:</span>
+            <span className="stat-item">최소온도 <b>{minTemp}°C</b></span>
+            <span className="stat-item">최대온도 <b>{maxTemp}°C</b></span>
+            <span className="stat-item">평균온도 <b>{avgTemp}°C</b></span>
+          </div>
+          <div className="time-filters">
+            <button className={timeRange === '1h' ? 'active' : ''} onClick={() => setTimeRange('1h')}>1H</button>
+            <button className={timeRange === '8h' ? 'active' : ''} onClick={() => setTimeRange('8h')}>8H</button>
+            <button className={timeRange === '24h' ? 'active' : ''} onClick={() => setTimeRange('24h')}>24H</button>
+            <button className={timeRange === '7d' ? 'active' : ''} onClick={() => setTimeRange('7d')}>7일</button>
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={320}>
+          <AreaChart data={history.length ? history : [
+            { time: '데이터 대기중', temp: 20, hum: 50, ec: 1.0 },
+            { time: '데이터 대기중.', temp: 22, hum: 55, ec: 1.2 }
+          ]}>
+            <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="time" stroke="#94a3b8" tick={{fontSize: 12}} />
+            <YAxis stroke="#94a3b8" tick={{fontSize: 12}} />
+            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#f8fafc' }} />
+            <Area isAnimationActive={false} type="monotone" dataKey="temp" stroke="#ff4d4d" strokeWidth={3} fillOpacity={0.3} fill="#ff4d4d" name="온도" />
+            <Area isAnimationActive={false} type="monotone" dataKey="hum" stroke="#4da6ff" strokeWidth={3} fillOpacity={0.3} fill="#4da6ff" name="습도" />
+            <Area isAnimationActive={false} type="monotone" dataKey="ec" stroke="#22c55e" strokeWidth={3} fillOpacity={0.3} fill="#22c55e" name="EC" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="log-history">
+        <h3>📋 실시간 로그 히스토리</h3>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>시간</th><th>온도 (°C)</th><th>습도 (%)</th><th>EC (mS/cm)</th><th>pH</th><th>PPFD (µmol)</th><th>양액온도 (°C)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...history].reverse().map((item, idx) => (
+                <tr key={idx}>
+                  <td>{item.time}</td><td>{item.temp}</td><td>{item.hum}</td><td>{item.ec}</td><td>{item.ph}</td><td>{item.ppfd}</td><td>{item.nutTemp}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="control">
+        <button style={{ background: control.pump ? '#10b981' : '' }} onClick={() => toggle('pump')}>PUMP {control.pump ? 'ON' : 'OFF'}</button>
+        <button style={{ background: control.fan ? '#3b82f6' : '' }} onClick={() => toggle('fan')}>FAN {control.fan ? 'ON' : 'OFF'}</button>
+        <button style={{ background: control.led ? '#f59e0b' : '' }} onClick={() => toggle('led')}>LED {control.led ? 'ON' : 'OFF'}</button>
+        <button style={{ background: control.heater ? '#ef4444' : '' }} onClick={() => toggle('heater')}>HEATER {control.heater ? 'ON' : 'OFF'}</button>
+      </div>
+
+      <div className="footer">copyright @ originated jhk in 2026</div>
+
+      <style jsx>{`
+        .scada { background: #05070f; color: white; min-height: 100vh; padding: 24px; font-size: 18px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f2937; margin-bottom: 16px; }
+        .nav-links { display: flex; gap: 16px; }
+        .nav-link { color: #2563eb; text-decoration: none; font-weight: bold; }
+        .nav-link:hover { color: #1d4ed8; }
+        .weather-panel { background: #0b1220; padding: 18px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
+        .weather-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+        .weather-panel h3 { margin: 0; color: #e2e8f0; font-size: 18px; }
+        .weather-coordinates { text-align: right; color: #94a3b8; font-size: 14px; line-height: 1.5; }
+        .weather-details { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; background: #111827; padding: 16px; border-radius: 8px; }
+        .weather-grid { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 12px; }
+        .weather-card { background: #0f172a; padding: 14px; border: 1px solid #334155; border-radius: 10px; display: flex; flex-direction: column; justify-content: space-between; color: #cbd5e1; }
+        .weather-card strong { color: #f8fafc; margin-bottom: 8px; font-size: 14px; }
+        .weather-card span { font-size: 16px; font-weight: 700; }
+        .weather-meta { color: #cbd5e1; display: flex; flex-direction: column; justify-content: space-between; }
+        .weather-meta p { margin: 8px 0; font-size: 15px; }
+        .weather-meta strong { color: #f8fafc; }
+        .recommendation-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
+        .recommendation-panel h2 { margin-top: 0; color: #94a3b8; margin-bottom: 12px; }
+        .recommendation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+        .recommendation-card { background: #111827; padding: 14px; border: 1px solid #334155; border-radius: 10px; color: #e2e8f0; }
+        .recommendation-card strong { display: block; margin-bottom: 8px; color: #f8fafc; }
+        .recommendation-note { color: #c7d2fe; margin-top: 16px; }
+        .gauges { display: flex; justify-content: space-around; } 
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .chart { margin-top: 20px; background: #0b1220; padding: 16px; border: 1px solid #1f2937; }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .stats { display: flex; gap: 16px; color: #94a3b8; }
+        .stat-item b { color: #f8fafc; margin-left: 4px; }
+        .time-filters { display: flex; gap: 4px; }
+        .time-filters button { padding: 6px 12px; background: transparent; border: 1px solid #334155; color: #94a3b8; }
+        .time-filters button.active { background: #1e293b; color: white; border-color: #64748b; }
+        .log-history { margin-top: 20px; background: #0b1220; padding: 16px; border: 1px solid #1f2937; }
+        .log-history h3 { margin-top: 0; color: #94a3b8; margin-bottom: 12px; }
+        .table-wrapper { max-height: 250px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 14px; }
+        th { position: sticky; top: 0; background: #1e293b; color: #f8fafc; padding: 10px; border-bottom: 2px solid #334155; }
+        td { padding: 8px 10px; border-bottom: 1px solid #1f2937; color: #cbd5e1; }
+        tr:hover td { background: #1e293b; }
+        .control { margin-top: 20px; display: flex; gap: 10px; }
+        button { padding: 12px; font-weight: bold; border-radius: 8px; background: #0b1220; border: 1px solid #334155; color: white; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #1e293b; }
+        .footer { margin-top: 30px; text-align: center; color: #64748b; }
+        .status.CONNECTED { color: #22c55e; }
+        .status.CONNECTING { color: #facc15; }
+        .status.DISCONNECTED { color: #ef4444; }
+        .gauge-box { background: #0b1220; padding: 16px 8px; border: 1px solid #1f2937; display: flex; justify-content: center; }
+      `}</style>
+    </div>
+  );
+}
+
+/* ================= UI SUB-COMPONENTS ================= */
+function Clock() {
+  const [time, setTime] = useState<string>('');
+  useEffect(() => {
+    setTime(new Date().toLocaleString());
+    const t = setInterval(() => setTime(new Date().toLocaleString()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <div>{time}</div>;
+}
+
+type GaugeProps = { value: number; min: number; max: number; label: string; unit: string; color: string; };
+function Gauge({ value, min, max, label, unit, color }: GaugeProps) {
+  const val = Math.min(Math.max(value, min), max);
+  const percentage = (val - min) / (max - min);
+  const data = [{ name: 'value', value: percentage }, { name: 'empty', value: 1 - percentage }];
+  return (
+    <div style={{ position: 'relative', width: '120px', height: '100px' }}>
+      <ResponsiveContainer width="100%" height={80}>
+        <PieChart>
+          <Pie data={data} cx="50%" cy="100%" startAngle={180} endAngle={0} innerRadius={30} outerRadius={45} dataKey="value" stroke="none" isAnimationActive={false}>
+            <Cell fill={color} /><Cell fill="#1f2937" />
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+      <div style={{ position: 'absolute', bottom: '-5px', width: '100%', textAlign: 'center' }}>
+        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#f8fafc' }}>{value}<span style={{ fontSize: '14px', marginLeft: '2px' }}>{unit}</span></div>
+        <div style={{ fontSize: '12px', color: '#64748b' }}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function WeatherWidget() {
+  const [weather, setWeather] = useState<any>(null);
+  const [location, setLocation] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const formatCoordinate = (value: number | null | undefined, type: 'lat' | 'lon') => {
+    if (value === null || value === undefined || Number.isNaN(value)) return '-';
+    const abs = Math.abs(value).toFixed(4);
+    const direction = type === 'lat' ? (value >= 0 ? '북위' : '남위') : (value >= 0 ? '동경' : '서경');
+    return `${direction} ${abs}°`;
+  };
+
+  const formatTime = (value: string | null | undefined) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value.replace('T', ' ');
+    return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  useEffect(() => {
+    async function fetchWeatherByLocation() {
+      try {
+        const lat = 37.545;
+        const lon = 127.123;
+        setLocation({ lat, lon, name: '천호동' });
+        
+        const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+        const data = await res.json();
+        setWeather(data);
+      } catch (e) {
+        console.error('날씨 정보 로드 실패:', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchWeatherByLocation();
+    const t = setInterval(fetchWeatherByLocation, 600000); 
+    return () => clearInterval(t);
+  }, []);
+
+  if (loading || !weather) {
+    return <div className="weather-panel">📍 위치 기반 날씨 정보 불러오는 중...</div>;
+  }
+
+  return (
+    <div className="weather-panel">
+      <div className="weather-panel-header">
+        <h3>📍 기상청 표시 ({weather.location})</h3>
+        <div className="weather-coordinates">
+          {weather.coordinates ? (
+            <>
+              <div>{formatCoordinate(weather.coordinates.lat, 'lat')}</div>
+              <div>{formatCoordinate(weather.coordinates.lon, 'lon')}</div>
+            </>
+          ) : (
+            <div>{location?.name ?? '위치 정보 없음'}</div>
+          )}
+        </div>
+      </div>
+      <div className="weather-details">
+        <div className="weather-grid">
+          <div className="weather-card"><strong>온도</strong><span>{weather.temperature ?? '-'}°C</span></div>
+          <div className="weather-card"><strong>습도</strong><span>{weather.humidity ? `${weather.humidity}%` : '-'}</span></div>
+          <div className="weather-card"><strong>자외선 지수</strong><span>{weather.uvIndex ?? '-'} </span></div>
+          <div className="weather-card"><strong>미세먼지 PM10</strong><span>{weather.pm10 ? `${weather.pm10.toFixed(1)}` : '-'} μg/m³</span></div>
+          <div className="weather-card"><strong>미세먼지 PM2.5</strong><span>{weather.pm2_5 ? `${weather.pm2_5.toFixed(1)}` : '-'} μg/m³</span></div>
+          <div className="weather-card"><strong>일출</strong><span>{formatTime(weather.sunrise)}</span></div>
+          <div className="weather-card"><strong>일몰</strong><span>{formatTime(weather.sunset)}</span></div>
+          <div className="weather-card"><strong>구름</strong><span>{weather.cloudCover ? `${weather.cloudCover}%` : '-'}</span></div>
+        </div>
+        <div className="weather-meta">
+          <p>☁️ 날씨: <strong>{weather.weatherDescription}</strong></p>
+          <p>💨 풍속: <strong>{weather.windspeed ? `${weather.windspeed} m/s` : '-'}</strong></p>
+          <p>🧭 풍향: <strong>{weather.windDirection ? `${weather.windDirection}°` : '-'}</strong></p>
+          <p style={{ marginTop: 8, fontSize: 14, color: '#94a3b8' }}>
+            업데이트: {weather.timestamp ? new Date(weather.timestamp).toLocaleTimeString('ko-KR') : '-'}
+          </p>
+          {weather.dataQuality && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>
+              <p>📊 데이터 신뢰도: 
+                <span style={{ 
+                  color: weather.dataQuality.overall === 'high' ? '#10b981' : 
+                         weather.dataQuality.overall === 'medium' ? '#f59e0b' : '#ef4444',
+                  fontWeight: 'bold'
+                }}>
+                  {weather.dataQuality.overall === 'high' ? ' 높음' : 
+                   weather.dataQuality.overall === 'medium' ? ' 보통' : ' 낮음'}
+                </span>
+              </p>
+              <p style={{ fontSize: 11, marginTop: 4 }}>
+                출처: {weather.dataSource || 'Open-Meteo'}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+======================================
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+export default function Navbar() {
+  const pathname = usePathname();
+
+  const navItems = [
+    { name: '대시보드', path: '/dashboard' },
+    { name: '일지 작성', path: '/journal' },
+    { name: '일지 목록', path: '/journal/list' },
+  ];
+
+  return (
+    <nav className="navbar">
+      <div className="logo">
+        <Link href="/dashboard">🌱 Glover Smart Farm</Link>
+      </div>
+      <div className="menu">
+        {navItems.map((item) => {
+          const isActive = pathname === item.path;
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={`menu-item ${isActive ? 'active' : ''}`}
+            >
+              {item.name}
+            </Link>
+          );
+        })}
+      </div>
+
+      <style jsx>{`
+        .navbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1rem 2rem;
+          background-color: #0b1220;
+          border-bottom: 2px solid #1f2937;
+        }
+        .logo a {
+          color: #facc15; /* 눈에 띄는 밝은 노란색 */
+          font-size: 1.5rem;
+          font-weight: bold;
+          text-decoration: none;
+        }
+        .menu {
+          display: flex;
+          gap: 1rem;
+          justify-content: flex-end; /* 메뉴를 오른쪽으로 정렬 */
+        }
+        .menu-item {
+          color: #f8fafc; /* 어두운 회색에서 가장 밝은 흰색으로 변경 */
+          text-decoration: none;
+          font-size: 1.1rem;
+          font-weight: bold;
+          padding: 0.6rem 1.2rem;
+          border-radius: 8px;
+          transition: all 0.2s ease-in-out;
+        }
+        .menu-item:hover {
+          background-color: #1e293b;
+          color: white;
+        }
+        /* ✨ 누른 곳(현재 페이지) 노란색 강조 효과 ✨ */
+        .menu-item.active {
+          color: #facc15;
+          background-color: rgba(250, 204, 21, 0.15);
+          border: 1px solid #facc15;
+          box-shadow: 0 0 10px rgba(250, 204, 21, 0.2);
+        }
+      `}</style>
+    </nav>
+  );
+}

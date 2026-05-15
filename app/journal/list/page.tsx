@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { createClient } from '@supabase/supabase-js';
+
+// Supabase 클라이언트 초기화 (API를 거치지 않고 DB에서 직접 가져오기 위함)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 type JournalImage = {
   id: string;
@@ -25,18 +31,33 @@ export default function JournalList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
   useEffect(() => {
     async function fetchJournals() {
       try {
-        const res = await fetch('/api/journal', { cache: 'no-store' });
-        const data = await res.json();
-        
-        if (data.success) {
-          // 💡 서버에서 온 데이터가 배열이 아닌 경우 앱이 터지는 것(map error) 방지
-          setJournals(Array.isArray(data.data) ? data.data : (data.data ? [data.data] : []));
-        } else {
-          setError('데이터를 불러오는데 실패했습니다.');
+        // API 오류를 우회하고 DB에서 직접 데이터와 사진을 확실하게 불러옵니다.
+        const { data, error: fetchError } = await supabase
+          .from('journals')
+          .select('*, journal_images(*)');
+          
+        if (fetchError) throw fetchError;
+
+        const mappedData = (data || []).map((row: any) => ({
+          id: row.id,
+          date: row.date,
+          height: row.height,
+          leafSize: row.leaf_size,
+          waterAmount: row.water_amount,
+          notes: row.notes,
+          photos: row.photos,
+          journal_images: row.journal_images
+        }));
+
+        setJournals(mappedData);
+        const availableMonths = Array.from(new Set(mappedData.filter((j: any) => j && j.date).map((j: any) => j.date.substring(0, 7)))).sort().reverse();
+        if (availableMonths.length > 0) {
+          setSelectedMonth(availableMonths[0] as string);
         }
       } catch (err) {
         setError('서버와 통신 중 오류가 발생했습니다.');
@@ -49,6 +70,10 @@ export default function JournalList() {
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>데이터를 불러오는 중입니다...</div>;
   if (error) return <div style={{ padding: '2rem', color: 'red', textAlign: 'center' }}>{error}</div>;
+
+  // 월별 필터링 계산
+  const availableMonths = Array.from(new Set(journals.filter(j => j && j.date).map(j => j.date.substring(0, 7)))).sort().reverse();
+  const filteredJournals = journals.filter(j => j && j.date && j.date.startsWith(selectedMonth));
 
   return (
     <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', fontFamily: 'sans-serif' }}>
@@ -64,13 +89,37 @@ export default function JournalList() {
         </div>
       </div>
 
-      {journals.length === 0 ? (
+      {/* 월별 필터 탭 (버튼) UI */}
+      {availableMonths.length > 0 && (
+        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '15px', marginBottom: '20px', borderBottom: '2px solid #e2e8f0' }}>
+          {availableMonths.map(month => (
+            <button
+              key={month}
+              onClick={() => setSelectedMonth(month as string)}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '20px',
+                border: 'none',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                background: selectedMonth === month ? '#10b981' : '#e2e8f0',
+                color: selectedMonth === month ? 'white' : '#475569',
+                transition: 'all 0.2s ease-in-out'
+              }}
+            >
+              {month}월
+            </button>
+          ))}
+        </div>
+      )}
+
+      {filteredJournals.length === 0 ? (
         <div style={{ textAlign: 'center', color: '#64748b', padding: '3rem', background: '#f8fafc', borderRadius: '12px' }}>
-          등록된 영농일지가 없습니다. 첫 일지를 작성해 보세요!
+          해당 월에 등록된 영농일지가 없습니다. 첫 일지를 작성해 보세요!
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {journals.map((journal, index) => {
+          {filteredJournals.map((journal, index) => {
             if (!journal) return null; // 💡 비어있는 데이터 행이 있을 경우 무시
             return (
             <div key={journal.id || `journal-${index}`} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>

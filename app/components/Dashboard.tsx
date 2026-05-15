@@ -131,12 +131,15 @@ export default function Dashboard() {
     setControl((prev) => {
       const next = !prev[key];
       if (clientRef.current && clientRef.current.connected) {
-        // ESP32 소스코드에 맞춘 JSON 명령어 전송
+        // 기기가 인식할 수 있는 JSON 명령어 포맷으로 전송
         const command: any = { cmd_type: "manual", devices: { [key]: { on: next } } };
         if (key === 'pump' && next) {
           command.devices.pump.duration_sec = 10; // 펌프 10초 가동 후 자동 종료
         }
+        console.log(`[MQTT 전송 완료] smartfarm/jeho123/control ->`, command);
         clientRef.current.publish('smartfarm/jeho123/control', JSON.stringify(command));
+      } else {
+        console.warn("MQTT 서버와 연결되지 않아 제어 명령을 보낼 수 없습니다.");
       }
       return { ...prev, [key]: next };
     });
@@ -192,6 +195,37 @@ export default function Dashboard() {
       </div>
 
       <WeatherWidget />
+
+      <div className="camera-panel">
+        <h2>📷 실시간 모니터링 영상</h2>
+        <div className="camera-grid">
+          <div className="camera-card">
+            <h3>라즈베리파이 (USB 캠)</h3>
+            <div className="video-wrapper">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="http://[라즈베리파이IP주소]:8080/stream" alt="Raspberry Pi Cam" />
+            </div>
+          </div>
+          <div className="camera-card">
+            <h3>내부 카메라 (ESP32-CAM)</h3>
+            <div className="video-wrapper">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="http://192.168.0.100:81/stream" alt="ESP32-CAM" />
+            </div>
+          </div>
+          <div className="camera-card">
+            <h3>참고 영상 (YouTube)</h3>
+            <div className="video-wrapper iframe-wrapper">
+              <iframe 
+                src="https://www.youtube.com/embed/b4nXr11Ja8o?list=RDb4nXr11Ja8o&autoplay=1" 
+                frameBorder="0" 
+                allow="autoplay; encrypted-media" 
+                allowFullScreen
+              ></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="recommendation-panel">
         <h2>추천 제어값</h2>
@@ -255,14 +289,17 @@ export default function Dashboard() {
           </div>
         </div>
         <ResponsiveContainer width="100%" height={320}>
-          <AreaChart data={history.length ? history : [{ time: '--', temp: 0, hum: 0, ec: 0 }]}>
-            <CartesianGrid stroke="#1f2937" />
-            <XAxis dataKey="time" />
-            <YAxis />
-            <Tooltip />
-            <Area isAnimationActive={false} type="monotone" dataKey="temp" stroke="#ff4d4d" fillOpacity={0.2} fill="#ff4d4d" name="온도" />
-            <Area isAnimationActive={false} type="monotone" dataKey="hum" stroke="#4da6ff" fillOpacity={0.2} fill="#4da6ff" name="습도" />
-            <Area isAnimationActive={false} type="monotone" dataKey="ec" stroke="#22c55e" fillOpacity={0.2} fill="#22c55e" name="EC" />
+          <AreaChart data={history.length ? history : [
+            { time: '데이터 대기중', temp: 20, hum: 50, ec: 1.0 },
+            { time: '데이터 대기중.', temp: 22, hum: 55, ec: 1.2 }
+          ]}>
+            <CartesianGrid stroke="#1f2937" strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="time" stroke="#94a3b8" tick={{fontSize: 12}} />
+            <YAxis stroke="#94a3b8" tick={{fontSize: 12}} />
+            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#f8fafc' }} />
+            <Area isAnimationActive={false} type="monotone" dataKey="temp" stroke="#ff4d4d" strokeWidth={3} fillOpacity={0.3} fill="#ff4d4d" name="온도" />
+            <Area isAnimationActive={false} type="monotone" dataKey="hum" stroke="#4da6ff" strokeWidth={3} fillOpacity={0.3} fill="#4da6ff" name="습도" />
+            <Area isAnimationActive={false} type="monotone" dataKey="ec" stroke="#22c55e" strokeWidth={3} fillOpacity={0.3} fill="#22c55e" name="EC" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -300,8 +337,8 @@ export default function Dashboard() {
         .scada { background: #05070f; color: white; min-height: 100vh; padding: 24px; font-size: 18px; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1f2937; margin-bottom: 16px; }
         .nav-links { display: flex; gap: 16px; }
-        .nav-link { color: #2563eb; text-decoration: none; font-weight: bold; }
-        .nav-link:hover { color: #1d4ed8; }
+        .nav-link { color: #facc15; text-decoration: none; font-weight: bold; }
+        .nav-link:hover { color: #fef08a; }
         .weather-panel { background: #0b1220; padding: 18px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
         .weather-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
         .weather-panel h3 { margin: 0; color: #e2e8f0; font-size: 18px; }
@@ -314,6 +351,15 @@ export default function Dashboard() {
         .weather-meta { color: #cbd5e1; display: flex; flex-direction: column; justify-content: space-between; }
         .weather-meta p { margin: 8px 0; font-size: 15px; }
         .weather-meta strong { color: #f8fafc; }
+        .camera-panel { background: #0b1220; padding: 18px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
+        .camera-panel h2 { margin-top: 0; color: #e2e8f0; font-size: 18px; }
+        .camera-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+        .camera-card { background: #111827; padding: 14px; border-radius: 10px; border: 1px solid #334155; }
+        .camera-card h3 { margin-top: 0; color: #cbd5e1; font-size: 15px; margin-bottom: 12px; text-align: center; }
+        .video-wrapper { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 8px; overflow: hidden; }
+        .video-wrapper img { width: 100%; height: 100%; object-fit: contain; }
+        .iframe-wrapper iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        @media (max-width: 768px) { .camera-grid { grid-template-columns: 1fr; } }
         .recommendation-panel { background: #0b1220; padding: 16px; border: 1px solid #1f2937; margin-bottom: 20px; border-radius: 12px; }
         .recommendation-panel h2 { margin-top: 0; color: #94a3b8; margin-bottom: 12px; }
         .recommendation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
