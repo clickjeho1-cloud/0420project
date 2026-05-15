@@ -65,8 +65,8 @@ export default function Page() {
   const [raspiInput, setRaspiInput] = useState<string>('');
   const [espUrl, setEspUrl] = useState<string>('');
   const [espInput, setEspInput] = useState<string>('');
-  const [ytUrl, setYtUrl] = useState<string>('');
-  const [ytInput, setYtInput] = useState<string>('');
+  const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/live/b4nXr11Ja8o');
+  const [ytInput, setYtInput] = useState<string>('https://www.youtube.com/live/b4nXr11Ja8o');
 
   /* ================= MQTT ================= */
   useEffect(() => {
