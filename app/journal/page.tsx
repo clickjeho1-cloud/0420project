@@ -431,7 +431,7 @@ export default function JournalPage() {
           padding: 2rem;
           color: #dbdee1;
           font-family: sans-serif;
-          background-color: #5865F2;
+          background-color: #1e1f22; /* 💡 너무 튀지 않도록 배경을 차분한 다크톤으로 복구합니다 */
           min-height: 100vh;
         }
         .form-wrapper {
