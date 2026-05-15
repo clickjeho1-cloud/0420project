@@ -236,10 +236,10 @@ export default function Page() {
           </div>
         </div>
         <ResponsiveContainer width="100%" height={320}>
-          <AreaChart data={history.length ? history : [{ time: '--', temp: 0, hum: 0, ec: 0 }]}>
+          <AreaChart data={history.length ? history : [{ time: '대기중...', temp: 0, hum: 0, ec: 0 }, { time: '센서 연결 대기', temp: 0, hum: 0, ec: 0 }]}>
             <CartesianGrid stroke="#4e5058" strokeDasharray="3 3" />
             <XAxis dataKey="time" stroke="#b5bac1" />
-            <YAxis stroke="#b5bac1" />
+            <YAxis stroke="#b5bac1" domain={[0, 100]} />
             <Tooltip contentStyle={{ backgroundColor: '#1e1f22', borderColor: '#4e5058', color: '#dbdee1' }} itemStyle={{ color: '#dbdee1' }} />
             <Area isAnimationActive={false} type="monotone" dataKey="temp" stroke="#ff4d4d" fillOpacity={0.2} fill="#ff4d4d" name="온도" />
             <Area isAnimationActive={false} type="monotone" dataKey="hum" stroke="#4da6ff" fillOpacity={0.2} fill="#4da6ff" name="습도" />
