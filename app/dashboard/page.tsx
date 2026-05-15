@@ -241,7 +241,7 @@ export default function Page() {
                 getYoutubeId(ytUrl) ? (
                   <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${getYoutubeId(ytUrl)}?autoplay=1&mute=1`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                 ) : (
-                  <img src={ytUrl} alt="Stream" crossOrigin="anonymous" />
+                  <img src={https://www.youtube.com/live/b4nXr11Ja8o} alt="Stream" crossOrigin="anonymous" />
                 )
               ) : (
                 <div className="video-placeholder">링크 입력 대기</div>
