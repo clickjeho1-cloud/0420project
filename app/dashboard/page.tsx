@@ -61,8 +61,12 @@ export default function Page() {
   const [control, setControl] = useState({ pump: false, fan: false, led: false });
   const [recommendation, setRecommendation] = useState<Suggestion | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string>('');
-  const [inputUrl, setInputUrl] = useState<string>('');
+  const [raspiUrl, setRaspiUrl] = useState<string>('');
+  const [raspiInput, setRaspiInput] = useState<string>('');
+  const [espUrl, setEspUrl] = useState<string>('');
+  const [espInput, setEspInput] = useState<string>('');
+  const [ytUrl, setYtUrl] = useState<string>('');
+  const [ytInput, setYtInput] = useState<string>('');
 
   /* ================= MQTT ================= */
   useEffect(() => {
@@ -184,34 +188,66 @@ export default function Page() {
       <WeatherWidget />
 
       <div className="video-panel">
-        <h2>📷 실시간 스마트팜 CCTV</h2>
-        <div className="video-input-group">
-          <input 
-            type="text" 
-            placeholder="ESP32, 라즈베리파이 주소 또는 유튜브 링크를 입력하세요" 
-            value={inputUrl}
-            onChange={(e) => setInputUrl(e.target.value)}
-          />
-          <button onClick={() => setVideoUrl(inputUrl)}>영상 연결</button>
-        </div>
-        <div className="video-container">
-          {videoUrl ? (
-            getYoutubeId(videoUrl) ? (
-              <iframe 
-                width="100%" 
-                height="100%" 
-                src={`https://www.youtube.com/embed/${getYoutubeId(videoUrl)}?autoplay=1&mute=1`} 
-                title="YouTube video player" 
-                frameBorder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-                allowFullScreen
-              ></iframe>
-            ) : (
-              <img src={videoUrl} alt="CCTV Stream" crossOrigin="anonymous" />
-            )
-          ) : (
-            <div className="video-placeholder">카메라 주소 또는 유튜브 링크를 입력하고 연결을 눌러주세요.</div>
-          )}
+        <h2>📷 실시간 스마트팜 멀티 CCTV</h2>
+        <div className="video-multi-grid">
+          {/* 1. 라즈베리파이 캠 */}
+          <div className="video-card">
+            <h3>1. 라즈베리파이 캠</h3>
+            <div className="video-input-group">
+              <input 
+                type="text" 
+                placeholder="주소 입력 (예: http://192.168.x.x:8080)" 
+                value={raspiInput}
+                onChange={(e) => setRaspiInput(e.target.value)}
+              />
+              <button onClick={() => setRaspiUrl(raspiInput)}>연결</button>
+            </div>
+            <div className="video-container">
+              {raspiUrl ? <img src={raspiUrl} alt="Raspberry Pi Stream" crossOrigin="anonymous" /> : <div className="video-placeholder">주소 입력 대기</div>}
+            </div>
+          </div>
+
+          {/* 2. ESP32 캠 */}
+          <div className="video-card">
+            <h3>2. ESP32 캠</h3>
+            <div className="video-input-group">
+              <input 
+                type="text" 
+                placeholder="주소 입력 (예: http://192.168.x.x:81/stream)" 
+                value={espInput}
+                onChange={(e) => setEspInput(e.target.value)}
+              />
+              <button onClick={() => setEspUrl(espInput)}>연결</button>
+            </div>
+            <div className="video-container">
+              {espUrl ? <img src={espUrl} alt="ESP32 Stream" crossOrigin="anonymous" /> : <div className="video-placeholder">주소 입력 대기</div>}
+            </div>
+          </div>
+
+          {/* 3. 유튜브 스트리밍 */}
+          <div className="video-card">
+            <h3>3. 유튜브 실시간 스트리밍</h3>
+            <div className="video-input-group">
+              <input 
+                type="text" 
+                placeholder="유튜브 링크 입력" 
+                value={ytInput}
+                onChange={(e) => setYtInput(e.target.value)}
+              />
+              <button onClick={() => setYtUrl(ytInput)}>연결</button>
+            </div>
+            <div className="video-container">
+              {ytUrl ? (
+                getYoutubeId(ytUrl) ? (
+                  <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${getYoutubeId(ytUrl)}?autoplay=1&mute=1`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                ) : (
+                  <img src={ytUrl} alt="Stream" crossOrigin="anonymous" />
+                )
+              ) : (
+                <div className="video-placeholder">링크 입력 대기</div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -338,7 +374,10 @@ export default function Page() {
         .weather-meta strong { color: #ffffff; }
         .video-panel { background: #313338; padding: 18px; border: none; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .video-panel h2 { margin-top: 0; color: #f2f3f5; margin-bottom: 12px; font-size: 18px; }
-        .video-input-group { display: flex; gap: 10px; margin-bottom: 16px; }
+        .video-multi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        .video-card { display: flex; flex-direction: column; gap: 10px; background: #2b2d31; padding: 12px; border-radius: 8px; border: 1px solid #4e5058; }
+        .video-card h3 { margin: 0; font-size: 15px; color: #a3a6fa; }
+        .video-input-group { display: flex; gap: 10px; margin-bottom: 8px; }
         .video-input-group input { flex: 1; padding: 10px; background: #1e1f22; border: 1px solid #4e5058; color: #dbdee1; border-radius: 6px; outline: none; font-family: inherit; }
         .video-input-group input:focus { border-color: #5865F2; }
         .video-input-group button { padding: 10px 20px; background: #5865F2; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; white-space: nowrap; }
