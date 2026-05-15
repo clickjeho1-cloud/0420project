@@ -61,6 +61,8 @@ export default function Page() {
   const [control, setControl] = useState({ pump: false, fan: false, led: false });
   const [recommendation, setRecommendation] = useState<Suggestion | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string>('');
+  const [inputUrl, setInputUrl] = useState<string>('');
 
   /* ================= MQTT ================= */
   useEffect(() => {
@@ -161,6 +163,13 @@ export default function Page() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [history, v.temp, v.hum, v.ec, v.ph, v.ppfd, v.nutTemp]);
 
+  // 유튜브 링크에서 ID를 추출하는 함수
+  const getYoutubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=|live\/)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
   return (
     <div className="scada">
       <div className="header">
@@ -173,6 +182,38 @@ export default function Page() {
       </div>
 
       <WeatherWidget />
+
+      <div className="video-panel">
+        <h2>📷 실시간 스마트팜 CCTV</h2>
+        <div className="video-input-group">
+          <input 
+            type="text" 
+            placeholder="ESP32, 라즈베리파이 주소 또는 유튜브 링크를 입력하세요" 
+            value={inputUrl}
+            onChange={(e) => setInputUrl(e.target.value)}
+          />
+          <button onClick={() => setVideoUrl(inputUrl)}>영상 연결</button>
+        </div>
+        <div className="video-container">
+          {videoUrl ? (
+            getYoutubeId(videoUrl) ? (
+              <iframe 
+                width="100%" 
+                height="100%" 
+                src={`https://www.youtube.com/embed/${getYoutubeId(videoUrl)}?autoplay=1&mute=1`} 
+                title="YouTube video player" 
+                frameBorder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                allowFullScreen
+              ></iframe>
+            ) : (
+              <img src={videoUrl} alt="CCTV Stream" crossOrigin="anonymous" />
+            )
+          ) : (
+            <div className="video-placeholder">카메라 주소 또는 유튜브 링크를 입력하고 연결을 눌러주세요.</div>
+          )}
+        </div>
+      </div>
 
       <div className="recommendation-panel">
         <h2>추천 제어값</h2>
@@ -295,6 +336,16 @@ export default function Page() {
         .weather-meta { color: #dbdee1; display: flex; flex-direction: column; justify-content: space-between; }
         .weather-meta p { margin: 8px 0; font-size: 15px; }
         .weather-meta strong { color: #ffffff; }
+        .video-panel { background: #313338; padding: 18px; border: none; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .video-panel h2 { margin-top: 0; color: #f2f3f5; margin-bottom: 12px; font-size: 18px; }
+        .video-input-group { display: flex; gap: 10px; margin-bottom: 16px; }
+        .video-input-group input { flex: 1; padding: 10px; background: #1e1f22; border: 1px solid #4e5058; color: #dbdee1; border-radius: 6px; outline: none; font-family: inherit; }
+        .video-input-group input:focus { border-color: #5865F2; }
+        .video-input-group button { padding: 10px 20px; background: #5865F2; border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background 0.2s; white-space: nowrap; }
+        .video-input-group button:hover { background: #4752c4; }
+        .video-container { width: 100%; aspect-ratio: 16/9; background: #1e1f22; border-radius: 8px; overflow: hidden; display: flex; justify-content: center; align-items: center; border: 1px solid #4e5058; }
+        .video-container img { width: 100%; height: 100%; object-fit: contain; }
+        .video-placeholder { color: #80848e; }
         .recommendation-panel { background: #313338; padding: 16px; border: none; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .recommendation-panel h2 { margin-top: 0; color: #f2f3f5; margin-bottom: 12px; }
         .recommendation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
