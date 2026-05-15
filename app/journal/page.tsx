@@ -362,7 +362,7 @@ export default function JournalPage() {
             {imagePreviews.length > 0 && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '15px' }}>
                 {imagePreviews.map((src, index) => (
-                  <div key={index} style={{ position: 'relative', border: '1px solid #374151', borderRadius: '8px', padding: '5px', background: '#1a1d2d' }}>
+                  <div key={index} style={{ position: 'relative', borderRadius: '8px', padding: '5px', background: '#1e1f22' }}>
                     <div style={{ position: 'absolute', top: '5px', left: '5px', background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>사진 {index + 1}</div>
                     <img src={src} alt={`업로드된 작물 ${index + 1}`} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px' }} />
                     {clientAnalysis[index] && (
@@ -385,22 +385,22 @@ export default function JournalPage() {
             {analysisResult ? (
               <div className="result-box">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                  <h4 style={{ margin: 0, color: '#10b981' }}>📊 스마트 종합 진단 리포트 <span style={{fontSize: '0.8rem', color: '#9ca3af', fontWeight: 'normal'}}>(특이사항 입력란에 자동 적용됨)</span></h4>
+                  <h4 style={{ margin: 0, color: '#a3a6fa' }}>📊 스마트 종합 진단 리포트 <span style={{fontSize: '0.8rem', color: '#9ca3af', fontWeight: 'normal'}}>(특이사항 입력란에 자동 적용됨)</span></h4>
                 </div>
                 <div 
-                  style={{ lineHeight: '1.6', color: '#d1d5db', background: '#11131e', padding: '15px', borderRadius: '8px', border: '1px solid #10b981' }}
+                  style={{ lineHeight: '1.6', color: '#dbdee1', background: '#2b2d31', padding: '15px', borderRadius: '8px', border: '1px solid #5865F2' }}
                   dangerouslySetInnerHTML={{
                     __html: analysisResult
-                      .replace(/### (.*)/g, '<h3 style="color: #34d399; margin-top: 15px; margin-bottom: 5px;">$1</h3>')
-                      .replace(/## (.*)/g, '<h2 style="color: #10b981; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #374151; padding-bottom: 5px;">$1</h2>')
-                      .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #fff; background: rgba(16, 185, 129, 0.2); padding: 0 4px; border-radius: 4px;">$1</strong>')
+                      .replace(/### (.*)/g, '<h3 style="color: #a3a6fa; margin-top: 15px; margin-bottom: 5px;">$1</h3>')
+                      .replace(/## (.*)/g, '<h2 style="color: #a3a6fa; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #4e5058; padding-bottom: 5px;">$1</h2>')
+                      .replace(/\*\*(.*?)\*\*/g, '<strong style="color: #fff; background: rgba(88, 101, 242, 0.3); padding: 0 4px; border-radius: 4px;">$1</strong>')
                       .replace(/\*(.*?)\*/g, '<em>$1</em>')
                       .replace(/\n/g, '<br />')
                   }}
                 />
               </div>
             ) : (
-              <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem 0', margin: 0, border: '1px dashed #374151', borderRadius: '8px' }}>
+              <p style={{ textAlign: 'center', color: '#80848e', padding: '2rem 0', margin: 0, border: '1px dashed #4e5058', borderRadius: '8px' }}>
                 사진을 등록하고 "무료 진단 실행" 버튼을 누르면 기기 자체 분석이 시작됩니다.
               </p>
             )}
@@ -416,25 +416,28 @@ export default function JournalPage() {
         .container {
           display: flex;
           justify-content: center;
+          align-items: center;
           padding: 2rem;
-          color: #e5e7eb;
+          color: #dbdee1;
           font-family: sans-serif;
+          background-color: #5865F2;
+          min-height: 100vh;
         }
         .form-wrapper {
           width: 100%;
           max-width: 900px;
-          background-color: #11131e;
+          background-color: #313338;
           padding: 2.5rem;
           border-radius: 1rem;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-          border: 1px solid #1f2937;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+          border: none;
         }
         .header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           margin-bottom: 2rem;
-          border-bottom: 1px solid #374151;
+          border-bottom: 1px solid #4e5058;
           padding-bottom: 1rem;
         }
         .header h1 {
@@ -443,17 +446,17 @@ export default function JournalPage() {
           color: #fff;
         }
         .btn-back {
-          background-color: #f59e0b;
+          background-color: #4e5058;
           color: #fff;
           border: none;
           padding: 0.5rem 1rem;
           border-radius: 0.5rem;
           cursor: pointer;
           font-weight: bold;
-          box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+          box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         .btn-back:hover {
-          background-color: #d97706;
+          background-color: #6d6f78;
         }
         .form-grid {
           display: grid;
@@ -470,28 +473,28 @@ export default function JournalPage() {
         label {
           margin-bottom: 0.5rem;
           font-size: 0.875rem;
-          color: #9ca3af;
+          color: #b5bac1;
         }
         input, textarea {
-          background-color: #1a1d2d;
-          border: 1px solid #374151;
+          background-color: #1e1f22;
+          border: 1px solid #1e1f22;
           border-radius: 0.5rem;
           padding: 0.75rem;
-          color: #fff;
+          color: #dbdee1;
           outline: none;
           font-family: inherit;
         }
         input:focus, textarea:focus {
-          border-color: #10b981;
+          border-color: #5865F2;
         }
         .ai-section {
           margin-top: 2rem;
           padding: 1.5rem;
-          background-color: #1a1d2d;
-          border: 1px solid #374151;
-          border-top: 4px solid #10b981;
+          background-color: #2b2d31;
+          border: none;
+          border-top: 4px solid #5865F2;
           border-radius: 0.75rem;
-          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+          box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
         }
         .ai-header {
           display: flex;
@@ -514,7 +517,7 @@ export default function JournalPage() {
           width: 100%;
           padding: 1rem;
           margin-top: 2rem;
-          background-color: #10b981;
+          background-color: #5865F2;
           color: white;
           font-weight: bold;
           border: none;
@@ -523,11 +526,11 @@ export default function JournalPage() {
           font-size: 1.125rem;
         }
         .btn-submit:hover {
-          background-color: #059669;
+          background-color: #4752c4;
         }
         .btn-ai {
           padding: 0.5rem 1rem;
-          background-color: #10b981;
+          background-color: #5865F2;
           color: white;
           border: none;
           border-radius: 0.5rem;
@@ -536,25 +539,25 @@ export default function JournalPage() {
           transition: background-color 0.2s;
         }
         .btn-ai:hover {
-          background-color: #059669;
+          background-color: #4752c4;
         }
         .btn-ai:disabled, .btn-ai.analyzing {
-          background-color: #4b5563;
+          background-color: #4e5058;
           cursor: not-allowed;
         }
         .error-box {
           margin-top: 1rem;
           padding: 1rem;
-          background-color: rgba(127, 29, 29, 0.4);
-          color: #fca5a5;
-          border: 1px solid #991b1b;
+          background-color: rgba(250, 119, 124, 0.2);
+          color: #fa777c;
+          border: 1px solid #fa777c;
           border-radius: 0.5rem;
         }
         .result-box {
           margin-top: 1.5rem;
           padding: 1.5rem;
-          background-color: #1a1d2d;
-          border: 1px solid #374151;
+          background-color: #1e1f22;
+          border: none;
           border-radius: 0.5rem;
         }
         @media (max-width: 768px) {
