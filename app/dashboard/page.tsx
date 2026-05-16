@@ -230,7 +230,7 @@ export default function Page() {
             <div className="video-input-group">
               <input 
                 type="text" 
-                placeholder="https://www.youtube.com/watch?v=n_A6NobwTPc" 
+                placeholder="https://www.youtube.com/watch?v=UcyBZ4iC5Ro" 
                 value={ytInput}
                 onChange={(e) => setYtInput(e.target.value)}
               />
