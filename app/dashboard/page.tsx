@@ -65,8 +65,8 @@ export default function Page() {
   const [raspiInput, setRaspiInput] = useState<string>('');
   const [espUrl, setEspUrl] = useState<string>('');
   const [espInput, setEspInput] = useState<string>('');
-  const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/live/b4nXr11Ja8o');
-  const [ytInput, setYtInput] = useState<string>('https://www.youtube.com/live/b4nXr11Ja8o');
+  const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/watch?v=jfKfPfyJRdk'); // 24시간 스트리밍 URL (필요시 본인의 CCTV 라이브 링크로 변경)
+  const [ytInput, setYtInput] = useState<string>('https://www.youtube.com/watch?v=8ijvePEaNmg');
 
   /* ================= MQTT ================= */
   useEffect(() => {
