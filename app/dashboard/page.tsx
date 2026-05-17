@@ -54,6 +54,7 @@ const normalize = (msg: any): Sensor => ({
 /* ================= PAGE ================= */
 export default function Page() {
   const clientRef = useRef<MqttClient | null>(null);
+  const raspiImgRef = useRef<HTMLImageElement>(null);
   const espImgRef = useRef<HTMLImageElement>(null);
   const [sensor, setSensor] = useState<Sensor>(EMPTY);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -71,6 +72,9 @@ export default function Page() {
   
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<string | null>(null);
+  
+  const [raspiAiAnalyzing, setRaspiAiAnalyzing] = useState(false);
+  const [raspiAiResult, setRaspiAiResult] = useState<string | null>(null);
 
   /* ================= MQTT ================= */
   useEffect(() => {
@@ -178,6 +182,44 @@ export default function Page() {
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
+  // 라즈베리파이 캠 화면 캡처 및 AI 분석 함수 (작물 환경 + 병충해 종합 진단)
+  const captureAndAnalyzeRaspi = async () => {
+    if (!raspiUrl || !raspiImgRef.current) return alert("먼저 라즈베리파이 카메라를 연결해주세요.");
+    setRaspiAiAnalyzing(true);
+    setRaspiAiResult(null);
+    
+    try {
+      // 1. 브라우저 내부에서 라즈베리파이 카메라 영상을 이미지(Base64)로 캡처
+      const canvas = document.createElement('canvas');
+      canvas.width = raspiImgRef.current.naturalWidth;
+      canvas.height = raspiImgRef.current.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error("캔버스 생성 실패");
+      ctx.drawImage(raspiImgRef.current, 0, 0);
+      const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
+
+      // 2. 자체 AI 서버로 이미지와 '현재 환경 데이터'를 함께 전송
+      const res = await fetch('http://localhost:8000/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          image: base64Image,
+          sensors: { temp: v.temp, hum: v.hum, ec: v.ec, ph: v.ph, ppfd: v.ppfd } // 💡 환경 데이터 첨부
+        })
+      });
+
+      if (!res.ok) throw new Error("자체 AI 서버(로컬) 연결에 실패했습니다.");
+      
+      const data = await res.json();
+      setRaspiAiResult(`🌿 [환경 및 AI 종합 진단] ${data.message}`);
+
+    } catch (err: any) {
+      setRaspiAiResult(`❌ 에러: ${err.message}`);
+    } finally {
+      setRaspiAiAnalyzing(false);
+    }
+  };
+
   // ESP32-CAM 화면을 캡처하여 AI로 분석하는 가상(Mock) 함수
   const captureAndAnalyze = async () => {
     if (!espUrl || !espImgRef.current) return alert("먼저 ESP32 카메라를 연결해주세요.");
@@ -242,7 +284,16 @@ export default function Page() {
               <button onClick={() => setRaspiUrl(raspiInput)}>연결</button>
             </div>
             <div className="video-container">
-              {raspiUrl ? <img src={raspiUrl} alt="Raspberry Pi Stream" crossOrigin="anonymous" /> : <div className="video-placeholder">주소 입력 대기</div>}
+              {raspiUrl ? <img ref={raspiImgRef} src={raspiUrl} alt="Raspberry Pi Stream" crossOrigin="anonymous" /> : <div className="video-placeholder">주소 입력 대기</div>}
+            </div>
+            {/* 라즈베리파이 AI 비전 분석 UI 추가 */}
+            <div className="ai-vision-panel">
+              <button className="ai-btn" onClick={captureAndAnalyzeRaspi} disabled={raspiAiAnalyzing}>
+                {raspiAiAnalyzing ? '🤖 환경/작물 진단 및 분석 중...' : '📸 환경 진단 및 AI 분석'}
+              </button>
+              {raspiAiResult && (
+                <div className="ai-alert">{raspiAiResult}</div>
+              )}
             </div>
           </div>
 
