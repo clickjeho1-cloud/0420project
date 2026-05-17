@@ -1,0 +1,88 @@
+// =====================================================
+// READ EC (에코 무시 및 진짜 응답 필터링 적용)
+// =====================================================
+float readEC()
+{
+  // BUFFER CLEAR
+  while (RS485Serial.available()) {
+    RS485Serial.read();
+  }
+
+  // MODBUS REQUEST 프레임
+  uint8_t frame[6] = {
+    0x01,  // Device ID
+    0x03,  // Read Holding Registers
+    0x00, 0x01,  // 레지스터 주소 0x0001 (EC값)
+    0x00, 0x01   // 1개 읽기
+  };
+
+  // CRC 자동 계산 및 결합
+  uint16_t crc = calcCRC(frame, 6);
+  uint8_t request[8];
+  memcpy(request, frame, 6);
+  request[6] = crc & 0xFF;         // CRC Low
+  request[7] = (crc >> 8) & 0xFF;  // CRC High
+
+  // DEBUG 송신 프레임 출력
+  Serial.print("EC REQUEST  : ");
+  for (int i = 0; i < 8; i++) {
+    Serial.print("0x");
+    if (request[i] < 16) Serial.print("0");
+    Serial.print(request[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+
+  // SEND
+  RS485Serial.write(request, 8);
+  RS485Serial.flush(); // 송신 완료 대기
+
+  // RECEIVE 루프
+  uint8_t response[64]; // 에코까지 넉넉히 담을 수 있게 크기 증가
+  int idx = 0;
+  unsigned long startTime = millis();
+
+  // 넉넉하게 500ms 동안 수신 버퍼에 들어오는 모든 데이터를 싹 긁어모음 (에코 + 진짜 응답)
+  while (millis() - startTime < 500) {
+    if (RS485Serial.available()) {
+      response[idx++] = RS485Serial.read();
+      if (idx >= 64) break; 
+    }
+  }
+
+  // HEX DEBUG 수신 출력
+  Serial.print("EC RAW RESPONSE : ");
+  for (int i = 0; i < idx; i++) {
+    Serial.print("0x");
+    if (response[i] < 16) Serial.print("0");
+    Serial.print(response[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println();
+
+  // 💡 [핵심 수정] 수신된 전체 데이터 중에서 "01 03 02"로 시작하는 진짜 응답 프레임만 찾기!
+  int realDataStart = -1;
+  for (int i = 0; i <= idx - 5; i++) {
+    // 센서의 정상 응답은 항상 [0x01, 0x03, 0x02, 데이터H, 데이터L] 로 이루어집니다.
+    if (response[i] == 0x01 && response[i+1] == 0x03 && response[i+2] == 0x02) {
+      realDataStart = i;
+      break;
+    }
+  }
+
+  // 파싱 및 EC 계산
+  if (realDataStart != -1) {
+    // 진짜 응답을 찾은 경우
+    int value = (response[realDataStart + 3] << 8) | response[realDataStart + 4];
+    float ec  = value / 100.0;
+
+    Serial.print("EC REAL VALUE : ");
+    Serial.print(ec);
+    Serial.println(" us/cm");
+
+    return ec;
+  } else {
+    Serial.println("EC ERROR : NO VALID SENSOR RESPONSE FOUND");
+    return -1; // 센서가 진짜 응답을 안 한 경우 에러 처리 (-1)
+  }
+}

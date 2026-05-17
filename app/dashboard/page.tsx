@@ -54,6 +54,7 @@ const normalize = (msg: any): Sensor => ({
 /* ================= PAGE ================= */
 export default function Page() {
   const clientRef = useRef<MqttClient | null>(null);
+  const espImgRef = useRef<HTMLImageElement>(null);
   const [sensor, setSensor] = useState<Sensor>(EMPTY);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [status, setStatus] = useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
@@ -67,6 +68,9 @@ export default function Page() {
   const [espInput, setEspInput] = useState<string>('');
   const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/watch?v=gLGqC7KMLgc&t=111s'); // 24시간 스트리밍 URL (필요시 본인의 CCTV 라이브 링크로 변경)
   const [ytInput, setYtInput] = useState<string>('https://www.youtube.com/watch?v=tUhGh0RDis4');
+  
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState<string | null>(null);
 
   /* ================= MQTT ================= */
   useEffect(() => {
@@ -174,6 +178,41 @@ export default function Page() {
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
+  // ESP32-CAM 화면을 캡처하여 AI로 분석하는 가상(Mock) 함수
+  const captureAndAnalyze = async () => {
+    if (!espUrl || !espImgRef.current) return alert("먼저 ESP32 카메라를 연결해주세요.");
+    setAiAnalyzing(true);
+    setAiResult(null);
+    
+    try {
+      // 1. 브라우저 내부에서 카메라 영상을 이미지(Base64)로 캡처
+      const canvas = document.createElement('canvas');
+      canvas.width = espImgRef.current.naturalWidth;
+      canvas.height = espImgRef.current.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error("캔버스 생성 실패");
+      ctx.drawImage(espImgRef.current, 0, 0);
+      const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
+
+      // 2. 외부 유료 API가 아닌 '자체 구축한 로컬 AI API'로 전송
+      const res = await fetch('http://localhost:8000/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Image })
+      });
+
+      if (!res.ok) throw new Error("자체 AI 서버(로컬) 연결에 실패했습니다.");
+      
+      const data = await res.json();
+      setAiResult(`🌱 [자체 AI 분석 결과] ${data.message}`);
+
+    } catch (err: any) {
+      setAiResult(`❌ 에러: ${err.message} (Python FastAPI 서버가 켜져 있는지 확인하세요)`);
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
+
   return (
     <div className="scada">
       <div className="header">
@@ -220,7 +259,16 @@ export default function Page() {
               <button onClick={() => setEspUrl(espInput)}>연결</button>
             </div>
             <div className="video-container">
-              {espUrl ? <img src={espUrl} alt="ESP32 Stream" crossOrigin="anonymous" /> : <div className="video-placeholder">주소 입력 대기</div>}
+              {espUrl ? <img ref={espImgRef} src={espUrl} alt="ESP32 Stream" crossOrigin="anonymous" /> : <div className="video-placeholder">주소 입력 대기</div>}
+            </div>
+            {/* AI 비전 분석 UI 추가 */}
+            <div className="ai-vision-panel">
+              <button className="ai-btn" onClick={captureAndAnalyze} disabled={aiAnalyzing}>
+                {aiAnalyzing ? '🤖 AI 화면 전처리 및 분석 중...' : '📸 화면 캡처 및 AI 병해충 진단'}
+              </button>
+              {aiResult && (
+                <div className="ai-alert">{aiResult}</div>
+              )}
             </div>
           </div>
 
@@ -385,6 +433,12 @@ export default function Page() {
         .video-container { width: 100%; aspect-ratio: 16/9; background: #1e1f22; border-radius: 8px; overflow: hidden; display: flex; justify-content: center; align-items: center; border: 1px solid #4e5058; }
         .video-container img { width: 100%; height: 100%; object-fit: contain; }
         .video-placeholder { color: #80848e; }
+        .ai-vision-panel { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+        .ai-btn { background: #10b981; color: white; width: 100%; padding: 10px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .ai-btn:hover:not(:disabled) { background: #059669; }
+        .ai-btn:disabled { background: #4e5058; cursor: not-allowed; opacity: 0.7; }
+        .ai-alert { background: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444; color: #fca5a5; padding: 10px; font-size: 13px; border-radius: 4px; line-height: 1.4; animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         .recommendation-panel { background: #313338; padding: 16px; border: none; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .recommendation-panel h2 { margin-top: 0; color: #f2f3f5; margin-bottom: 12px; }
         .recommendation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
