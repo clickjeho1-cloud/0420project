@@ -284,7 +284,7 @@ export default function Page() {
               <button onClick={() => setRaspiUrl(raspiInput)}>연결</button>
             </div>
             <div className="video-container">
-              {raspiUrl ? <img ref={raspiImgRef} src={raspiUrl} alt="Raspberry Pi Stream" crossOrigin="anonymous" /> : <div className="video-placeholder">주소 입력 대기</div>}
+              {raspiUrl ? <img ref={raspiImgRef} src={raspiUrl} alt="Raspberry Pi Stream" /> : <div className="video-placeholder">주소 입력 대기</div>}
             </div>
             {/* 라즈베리파이 AI 비전 분석 UI 추가 */}
             <div className="ai-vision-panel">
