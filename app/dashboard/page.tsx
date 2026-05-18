@@ -42,6 +42,10 @@ type Suggestion = {
 
 const EMPTY: Sensor = { temp: 0, hum: 0, ec: 0, ph: 0, ppfd: 0, nutTemp: 0 };
 
+/* ================= CONFIG ================= */
+// 새 외부 IP를 받으시면 아래 '192.168.0.151' 부분을 새 외부 IP로 변경해 주세요.
+const RASPI_IP = process.env.NEXT_PUBLIC_RASPI_IP || '192.168.0.151';
+
 /* ================= HELPERS ================= */
 const normalize = (msg: any): Sensor => ({
   temp: msg?.values?.temp ?? msg?.temp ?? msg?.values?.temperature ?? msg?.temperature ?? 0,
@@ -64,8 +68,8 @@ export default function Page() {
   const [control, setControl] = useState({ pump: false, fan: false, led: false });
   const [recommendation, setRecommendation] = useState<Suggestion | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
-  const [raspiUrl, setRaspiUrl] = useState<string>('http://192.168.0.151:8080/stream');
-  const [raspiInput, setRaspiInput] = useState<string>('http://192.168.0.151:8080/stream');
+  const [raspiUrl, setRaspiUrl] = useState<string>(`http://${RASPI_IP}:8080/stream`);
+  const [raspiInput, setRaspiInput] = useState<string>(`http://${RASPI_IP}:8080/stream`);
   const [espUrl, setEspUrl] = useState<string>('');
   const [espInput, setEspInput] = useState<string>('');
   const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/watch?v=gLGqC7KMLgc&t=111s'); // 24시간 스트리밍 URL (필요시 본인의 CCTV 라이브 링크로 변경)
@@ -193,7 +197,7 @@ export default function Page() {
       // 1. 캔버스 보안 에러(Tainted canvas)를 피하기 위해, 
       // 프론트엔드가 아닌 AI 서버(Python)가 직접 스트리밍 주소로 접속해 캡처하도록 URL을 보냅니다.
       // 💡 라즈베리파이에서 구동 중인 AI 서버의 실제 IP(192.168.0.151)로 명시합니다.
-      const res = await fetch('http://192.168.0.151:8000/analyze', {
+      const res = await fetch(`http://${RASPI_IP}:8000/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -223,7 +227,7 @@ export default function Page() {
     
     try {
       // 1. ESP32 캠도 브라우저 캡처 대신 서버가 직접 캡처하도록 URL 전달
-      const res = await fetch('http://192.168.0.151:8000/analyze', {
+      const res = await fetch(`http://${RASPI_IP}:8000/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: "", url: espUrl })
