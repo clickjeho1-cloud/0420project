@@ -190,22 +190,14 @@ export default function Page() {
     setRaspiAiResult(null);
     
     try {
-      // 1. 브라우저 내부에서 라즈베리파이 카메라 영상을 이미지(Base64)로 캡처
-      const canvas = document.createElement('canvas');
-      canvas.width = raspiImgRef.current.naturalWidth;
-      canvas.height = raspiImgRef.current.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error("캔버스 생성 실패");
-      ctx.drawImage(raspiImgRef.current, 0, 0);
-      const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
-
-      // 2. 자체 AI 서버로 이미지와 '현재 환경 데이터'를 함께 전송
-      // 💡 현재 접속 중인 호스트(PC/라즈베리파이)의 IP를 자동으로 감지하여 포트 8000번으로 전송합니다.
+      // 1. 캔버스 보안 에러(Tainted canvas)를 피하기 위해, 
+      // 프론트엔드가 아닌 AI 서버(Python)가 직접 스트리밍 주소로 접속해 캡처하도록 URL을 보냅니다.
       const res = await fetch(`http://${window.location.hostname}:8000/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          image: base64Image,
+          image: "",
+          url: raspiUrl, // 서버가 직접 캡처할 카메라 주소
           sensors: { temp: v.temp, hum: v.hum, ec: v.ec, ph: v.ph, ppfd: v.ppfd } // 💡 환경 데이터 첨부
         })
       });
@@ -229,20 +221,11 @@ export default function Page() {
     setAiResult(null);
     
     try {
-      // 1. 브라우저 내부에서 카메라 영상을 이미지(Base64)로 캡처
-      const canvas = document.createElement('canvas');
-      canvas.width = espImgRef.current.naturalWidth;
-      canvas.height = espImgRef.current.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error("캔버스 생성 실패");
-      ctx.drawImage(espImgRef.current, 0, 0);
-      const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
-
-      // 2. 외부 유료 API가 아닌 '자체 구축한 로컬 AI API'로 전송
+      // 1. ESP32 캠도 브라우저 캡처 대신 서버가 직접 캡처하도록 URL 전달
       const res = await fetch(`http://${window.location.hostname}:8000/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64Image })
+        body: JSON.stringify({ image: "", url: espUrl })
       });
 
       if (!res.ok) throw new Error("자체 AI 서버(로컬) 연결에 실패했습니다.");
