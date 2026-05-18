@@ -63,8 +63,8 @@ export default function Page() {
   const [control, setControl] = useState({ pump: false, fan: false, led: false });
   const [recommendation, setRecommendation] = useState<Suggestion | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
-  const [raspiUrl, setRaspiUrl] = useState<string>('');
-  const [raspiInput, setRaspiInput] = useState<string>('');
+  const [raspiUrl, setRaspiUrl] = useState<string>('http://192.168.0.151:8080/stream');
+  const [raspiInput, setRaspiInput] = useState<string>('http://192.168.0.151:8080/stream');
   const [espUrl, setEspUrl] = useState<string>('');
   const [espInput, setEspInput] = useState<string>('');
   const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/watch?v=gLGqC7KMLgc&t=111s'); // 24시간 스트리밍 URL (필요시 본인의 CCTV 라이브 링크로 변경)
