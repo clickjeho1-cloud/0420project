@@ -192,7 +192,8 @@ export default function Page() {
     try {
       // 1. 캔버스 보안 에러(Tainted canvas)를 피하기 위해, 
       // 프론트엔드가 아닌 AI 서버(Python)가 직접 스트리밍 주소로 접속해 캡처하도록 URL을 보냅니다.
-      const res = await fetch(`http://${window.location.hostname}:8000/analyze`, {
+      // 💡 라즈베리파이에서 구동 중인 AI 서버의 실제 IP(192.168.0.151)로 명시합니다.
+      const res = await fetch('http://192.168.0.151:8000/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -222,7 +223,7 @@ export default function Page() {
     
     try {
       // 1. ESP32 캠도 브라우저 캡처 대신 서버가 직접 캡처하도록 URL 전달
-      const res = await fetch(`http://${window.location.hostname}:8000/analyze`, {
+      const res = await fetch('http://192.168.0.151:8000/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: "", url: espUrl })
