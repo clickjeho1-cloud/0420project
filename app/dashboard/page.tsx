@@ -199,7 +199,8 @@ export default function Page() {
       const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
 
       // 2. 자체 AI 서버로 이미지와 '현재 환경 데이터'를 함께 전송
-      const res = await fetch('http://localhost:8000/analyze', {
+      // 💡 현재 접속 중인 호스트(PC/라즈베리파이)의 IP를 자동으로 감지하여 포트 8000번으로 전송합니다.
+      const res = await fetch(`http://${window.location.hostname}:8000/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -237,7 +238,7 @@ export default function Page() {
       const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
 
       // 2. 외부 유료 API가 아닌 '자체 구축한 로컬 AI API'로 전송
-      const res = await fetch('http://localhost:8000/analyze', {
+      const res = await fetch(`http://${window.location.hostname}:8000/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64Image })
