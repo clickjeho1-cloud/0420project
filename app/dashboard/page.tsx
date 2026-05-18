@@ -256,12 +256,18 @@ export default function Page() {
     }
   };
 
+  const handleLogout = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.href = '/login';
+  };
+
   return (
     <div className="scada">
       <div className="header">
         <h1>Glovera Smart farm 대시보드</h1>
         <div className="nav-links">
           <Link href="/journal/list" className="nav-link">📖 영농일지</Link>
+          <button onClick={handleLogout} className="logout-btn">로그아웃</button>
         </div>
         <div className={`status ${status}`}>MQTT: {status}</div>
         <Clock />
@@ -460,6 +466,8 @@ export default function Page() {
         .nav-links { display: flex; gap: 16px; }
         .nav-link { color: white; background: rgba(0,0,0,0.2); padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: bold; transition: background 0.2s; }
         .nav-link:hover { background: rgba(0,0,0,0.4); }
+        .logout-btn { background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; font-size: 16px;}
+        .logout-btn:hover { background: #dc2626; }
         .weather-panel { background: #313338; padding: 18px; border: none; margin-bottom: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .weather-panel-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
         .weather-panel h3 { margin: 0; color: #f2f3f5; font-size: 18px; }
