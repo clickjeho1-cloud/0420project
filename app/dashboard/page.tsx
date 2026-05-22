@@ -221,7 +221,7 @@ export default function Page() {
 
   // ESP32-CAM 화면을 캡처하여 AI로 분석하는 가상(Mock) 함수
   const captureAndAnalyze = async () => {
-    if (!espUrl || !espImgRef.current) return alert("먼저 ESP32 카메라를 연결해주세요.");
+    if (!espUrl) return alert("먼저 ESP32 카메라를 연결해주세요.");
     setAiAnalyzing(true);
     setAiResult(null);
     
@@ -306,7 +306,13 @@ export default function Page() {
               <button onClick={() => setEspUrl(espInput)}>연결</button>
             </div>
             <div className="video-container">
-              {espUrl ? <img ref={espImgRef} src={espUrl} alt="ESP32 Stream" crossOrigin="anonymous" /> : <div className="video-placeholder">주소 입력 대기</div>}
+              {espUrl ? (
+                getYoutubeId(espUrl) ? (
+                  <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${getYoutubeId(espUrl)}?autoplay=1`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                ) : (
+                  <img ref={espImgRef} src={espUrl} alt="ESP32 Stream" crossOrigin="anonymous" />
+                )
+              ) : <div className="video-placeholder">주소 입력 대기</div>}
             </div>
             {/* AI 비전 분석 UI 추가 */}
             <div className="ai-vision-panel">
