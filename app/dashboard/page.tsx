@@ -70,8 +70,8 @@ export default function Page() {
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [raspiUrl, setRaspiUrl] = useState<string>(`http://${RASPI_IP}:8080/stream`);
   const [raspiInput, setRaspiInput] = useState<string>(`http://${RASPI_IP}:8080/stream`);
-  const [espUrl, setEspUrl] = useState<string>('');
-  const [espInput, setEspInput] = useState<string>('');
+  const [espUrl, setEspUrl] = useState<string>('https://www.youtube.com/watch?v=nmFpUDosSPc');
+  const [espInput, setEspInput] = useState<string>('https://www.youtube.com/watch?v=nmFpUDosSPc');
   const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/watch?v=gLGqC7KMLgc&t=111s'); // 24시간 스트리밍 URL (필요시 본인의 CCTV 라이브 링크로 변경)
   const [ytInput, setYtInput] = useState<string>('https://www.youtube.com/watch?v=tUhGh0RDis4');
   
