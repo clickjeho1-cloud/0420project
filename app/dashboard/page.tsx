@@ -44,7 +44,7 @@ const EMPTY: Sensor = { temp: 0, hum: 0, ec: 0, ph: 0, ppfd: 0, nutTemp: 0 };
 
 /* ================= CONFIG ================= */
 // 새 외부 IP를 받으시면 아래 '192.168.0.151' 부분을 새 외부 IP로 변경해 주세요.
-const RASPI_IP = process.env.NEXT_PUBLIC_RASPI_IP || '192.168.0.151';
+const RASPI_IP = process.env.NEXT_PUBLIC_RASPI_IP || '14.32.231.191';
 // 노드레드에서 제공하는 최신 이미지 주소
 const LATEST_IMG_URL = "http://14.32.231.191:41880/latest.jpg";
 
