@@ -45,6 +45,7 @@ const EMPTY: Sensor = { temp: 0, hum: 0, ec: 0, ph: 0, ppfd: 0, nutTemp: 0 };
 /* ================= CONFIG ================= */
 // 새 외부 IP를 받으시면 아래 '192.168.0.151' 부분을 새 외부 IP로 변경해 주세요.
 const RASPI_IP = process.env.NEXT_PUBLIC_RASPI_IP || '192.168.0.151';
+const GRAFANA_CCTV_URL = "http://14.32.231.191:41880/latest.jpg";
 
 /* ================= HELPERS ================= */
 const normalize = (msg: any): Sensor => ({
@@ -64,6 +65,7 @@ export default function Page() {
   const [sensor, setSensor] = useState<Sensor>(EMPTY);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [status, setStatus] = useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
+  const sensorRef = useRef<Sensor>(EMPTY);
   const [timeRange, setTimeRange] = useState<'1h' | '8h' | '24h' | '7d'>('1h');
   const [control, setControl] = useState({ pump: false, fan: false, led: false });
   const [recommendation, setRecommendation] = useState<Suggestion | null>(null);
@@ -80,6 +82,11 @@ export default function Page() {
   
   const [raspiAiAnalyzing, setRaspiAiAnalyzing] = useState(false);
   const [raspiAiResult, setRaspiAiResult] = useState<string | null>(null);
+
+  // 자동 분석 시 최신 센서 값을 참조하기 위해 Ref 업데이트
+  useEffect(() => {
+    sensorRef.current = sensor;
+  }, [sensor]);
 
   /* ================= MQTT ================= */
   useEffect(() => {
@@ -129,6 +136,47 @@ export default function Page() {
     return () => {
       if (clientRef.current) clientRef.current.end();
     };
+  }, []);
+
+  /* ================= AUTOMATED HOURLY AI LOGGING ================= */
+  useEffect(() => {
+    const HOURLY_INTERVAL = 60 * 60 * 1000; // 1시간 주기
+
+    const runAutoAnalysis = async () => {
+      try {
+        const s = sensorRef.current;
+        console.log("시작: 1시간 주기 자동 AI 병해충 분석...");
+        
+        // 1. AI 서버 분석 요청 (그라파나 CCTV URL 활용)
+        const res = await fetch(`http://${RASPI_IP}:8000/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            image: "", 
+            url: GRAFANA_CCTV_URL,
+            sensors: { temp: s.temp, hum: s.hum, ec: s.ec, ph: s.ph, ppfd: s.ppfd }
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          // 2. 영농일지 API에 '특이사항'으로 자동 기록
+          await fetch('/api/journal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              note: `[자동 AI 분석] ${data.message}`, 
+              type: 'AUTO_AI' 
+            })
+          });
+        }
+      } catch (err) {
+        console.error("자동 AI 분석 중 오류:", err);
+      }
+    };
+
+    const timer = setInterval(runAutoAnalysis, HOURLY_INTERVAL);
+    return () => clearInterval(timer);
   }, []);
 
   /* ================= CONTROL ================= */
@@ -322,6 +370,19 @@ export default function Page() {
               {aiResult && (
                 <div className="ai-alert">{aiResult}</div>
               )}
+            </div>
+          </div>
+
+          {/* 4. 그라파나 CCTV (자동 주기 분석) */}
+          <div className="video-card">
+            <h3>4. 그라파나 CCTV (1시간 주기 자동 분석)</h3>
+            <div className="video-container">
+              <img src={GRAFANA_CCTV_URL} alt="Grafana Stream" />
+            </div>
+            <div className="ai-vision-panel">
+              <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', margin: '8px 0' }}>
+                🤖 1시간마다 자동으로 캡처하여 AI 병해충 분석을 수행하고 영농일지에 기록합니다.
+              </p>
             </div>
           </div>
 
