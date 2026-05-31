@@ -70,8 +70,8 @@ export default function Page() {
   const [control, setControl] = useState({ pump: false, fan: false, led: false });
   const [recommendation, setRecommendation] = useState<Suggestion | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
-  const [raspiUrl, setRaspiUrl] = useState<string>(`http://${RASPI_IP}:8080/stream`);
-  const [raspiInput, setRaspiInput] = useState<string>(`http://${RASPI_IP}:8080/stream`);
+  const [raspiUrl, setRaspiUrl] = useState<string>(GRAFANA_CCTV_URL);
+  const [raspiInput, setRaspiInput] = useState<string>(GRAFANA_CCTV_URL);
   const [espUrl, setEspUrl] = useState<string>('https://www.youtube.com/shorts/kB0nYgNU_ZI');
   const [espInput, setEspInput] = useState<string>('https://youtu.be/nmFpUDosSPc');
   const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/watch?v=gLGqC7KMLgc&t=111s'); // 24시간 스트리밍 URL (필요시 본인의 CCTV 라이브 링크로 변경)
@@ -145,27 +145,29 @@ export default function Page() {
     const runAutoAnalysis = async () => {
       try {
         const s = sensorRef.current;
-        console.log("시작: 1시간 주기 자동 AI 병해충 분석...");
+        const timestamp = new Date().toLocaleString();
+        console.log(`[${timestamp}] 자동 AI 병해충 분석 시작...`);
         
-        // 1. AI 서버 분석 요청 (그라파나 CCTV URL 활용)
+        // 1. AI 서버 분석 요청 (노드레드 CCTV URL 활용)
+        // 캐시 방지를 위해 URL 뒤에 타임스탬프를 추가합니다.
         const res = await fetch(`http://${RASPI_IP}:8000/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             image: "", 
-            url: GRAFANA_CCTV_URL,
+            url: `${GRAFANA_CCTV_URL}?t=${Date.now()}`,
             sensors: { temp: s.temp, hum: s.hum, ec: s.ec, ph: s.ph, ppfd: s.ppfd }
           })
         });
 
         if (res.ok) {
           const data = await res.json();
-          // 2. 영농일지 API에 '특이사항'으로 자동 기록
+          // 2. 영농일지 API에 분석 결과를 '특이사항'으로 자동 기록
           await fetch('/api/journal', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              note: `[자동 AI 분석] ${data.message}`, 
+              note: `[실시간 AI 분석] ${data.message} (분석시간: ${timestamp})`, 
               type: 'AUTO_AI' 
             })
           });
