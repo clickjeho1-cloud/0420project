@@ -324,7 +324,7 @@ export default function Page() {
             <div className="video-input-group">
               <input 
                 type="text" 
-                placeholder="http://14.32.231.191:48080/" 
+                placeholder="http://14.32.231.191:48080/stream" 
                 value={raspiInput}
                 onChange={(e) => setRaspiInput(e.target.value)}
               />
