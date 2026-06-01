@@ -71,8 +71,8 @@ export default function Page() {
   const [control, setControl] = useState({ pump: false, fan: false, led: false });
   const [recommendation, setRecommendation] = useState<Suggestion | null>(null);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
-  const [raspiUrl, setRaspiUrl] = useState<string>(LATEST_IMG_URL);
-  const [raspiInput, setRaspiInput] = useState<string>(LATEST_IMG_URL);
+  const [raspiUrl, setRaspiUrl] = useState<string>('');
+  const [raspiInput, setRaspiInput] = useState<string>('');
   const [espUrl, setEspUrl] = useState<string>('https://www.youtube.com/shorts/kB0nYgNU_ZI');
   const [espInput, setEspInput] = useState<string>('https://youtu.be/nmFpUDosSPc');
   const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/watch?v=gLGqC7KMLgc&t=111s'); // 24시간 스트리밍 URL (필요시 본인의 CCTV 라이브 링크로 변경)
