@@ -324,7 +324,7 @@ export default function Page() {
             <div className="video-input-group">
               <input 
                 type="text" 
-                placeholder="주소 입력 (예: http://192.168.x.x:8080)" 
+                placeholder="http://14.32.231.191:48080/" 
                 value={raspiInput}
                 onChange={(e) => setRaspiInput(e.target.value)}
               />
