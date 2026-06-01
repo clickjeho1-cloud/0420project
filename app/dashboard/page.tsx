@@ -247,10 +247,11 @@ export default function Page() {
     try {
       // 1. 캔버스 보안 에러(Tainted canvas)를 피하기 위해, 
       // 프론트엔드가 아닌 AI 서버(Python)가 직접 스트리밍 주소로 접속해 캡처하도록 URL을 보냅니다.
-      // 💡 외부 포트 18000을 통해 내부 8000번 AI 서버로 접속합니다.
       const res = await fetch(`http://${RASPI_IP}:18000/analyze`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ 
           image: "",
           url: raspiUrl, // 서버가 직접 캡처할 카메라 주소
@@ -333,6 +334,7 @@ export default function Page() {
             <div className="video-container">
               {raspiUrl ? (
                 <VideoStream 
+                  key={raspiUrl}
                   src={raspiUrl} 
                   imgRef={raspiImgRef} 
                   alt="Raspberry Pi Stream" 
