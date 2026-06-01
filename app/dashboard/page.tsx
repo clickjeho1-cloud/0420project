@@ -46,7 +46,7 @@ const EMPTY: Sensor = { temp: 0, hum: 0, ec: 0, ph: 0, ppfd: 0, nutTemp: 0 };
 // 새 외부 IP를 받으시면 아래 '192.168.0.151' 부분을 새 외부 IP로 변경해 주세요.
 const RASPI_IP = process.env.NEXT_PUBLIC_RASPI_IP || '14.32.231.191';
 // 노드레드에서 제공하는 최신 이미지 주소
-const LATEST_IMG_URL = "http://14.32.231.191:48080/stream";
+const LATEST_IMG_URL = `http://${RASPI_IP}:48080/stream`;
 
 /* ================= HELPERS ================= */
 const normalize = (msg: any): Sensor => ({
@@ -336,7 +336,6 @@ export default function Page() {
                   ref={raspiImgRef} 
                   src={raspiUrl} 
                   alt="Raspberry Pi Stream" 
-                  crossOrigin="anonymous"
                   referrerPolicy="no-referrer" 
                 />
               ) : <div className="video-placeholder">주소 입력 대기</div>}
@@ -369,7 +368,7 @@ export default function Page() {
                 getYoutubeId(espUrl) ? (
                   <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${getYoutubeId(espUrl)}?autoplay=1`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                 ) : (
-                  <img ref={espImgRef} src={espUrl} alt="ESP32 Stream" crossOrigin="anonymous" />
+                  <img ref={espImgRef} src={espUrl} alt="ESP32 Stream" referrerPolicy="no-referrer" />
                 )
               ) : <div className="video-placeholder">주소 입력 대기</div>}
             </div>
@@ -418,7 +417,7 @@ export default function Page() {
                 getYoutubeId(ytUrl) ? (
                   <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${getYoutubeId(ytUrl)}?autoplay=1`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                 ) : (
-                  <img src={ytUrl} alt="Stream" crossOrigin="anonymous" />
+                  <img src={ytUrl} alt="Stream" referrerPolicy="no-referrer" />
                 )
               ) : (
                 <div className="video-placeholder">링크 입력 대기</div>
