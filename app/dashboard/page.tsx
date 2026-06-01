@@ -336,6 +336,7 @@ export default function Page() {
                   ref={raspiImgRef} 
                   src={raspiUrl} 
                   alt="Raspberry Pi Stream" 
+                  crossOrigin="anonymous"
                   referrerPolicy="no-referrer" 
                 />
               ) : <div className="video-placeholder">주소 입력 대기</div>}
@@ -357,7 +358,7 @@ export default function Page() {
             <div className="video-input-group">
               <input 
                 type="text" 
-                placeholder="주소 입력 (예: http://192.168.x.x:81/stream)" 
+                placeholder="http://14.23.231.191:48080/stream)" 
                 value={espInput}
                 onChange={(e) => setEspInput(e.target.value)}
               />
@@ -388,7 +389,7 @@ export default function Page() {
             <h3>4. 실시간 노드레드 영상 (영농일지 자동기록)</h3>
             <div className="video-container">
               <img 
-                src={`${LATEST_IMG_URL}?t=${Date.now()}`} 
+                src={LATEST_IMG_URL} 
                 alt="Latest Stream" 
                 referrerPolicy="no-referrer"
               />
