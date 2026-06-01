@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import Link from 'next/link';
 import mqtt, { MqttClient } from 'mqtt';
 import {
@@ -332,11 +332,10 @@ export default function Page() {
             </div>
             <div className="video-container">
               {raspiUrl ? (
-                <img 
-                  ref={raspiImgRef} 
+                <VideoStream 
                   src={raspiUrl} 
+                  imgRef={raspiImgRef} 
                   alt="Raspberry Pi Stream" 
-                  referrerPolicy="no-referrer" 
                 />
               ) : <div className="video-placeholder">주소 입력 대기</div>}
             </div>
@@ -357,7 +356,7 @@ export default function Page() {
             <div className="video-input-group">
               <input 
                 type="text" 
-                placeholder="http://14.23.231.191:48080/stream)" 
+                placeholder="http://14.32.231.191:48080/stream" 
                 value={espInput}
                 onChange={(e) => setEspInput(e.target.value)}
               />
@@ -368,7 +367,7 @@ export default function Page() {
                 getYoutubeId(espUrl) ? (
                   <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${getYoutubeId(espUrl)}?autoplay=1`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                 ) : (
-                  <img ref={espImgRef} src={espUrl} alt="ESP32 Stream" referrerPolicy="no-referrer" />
+                  <VideoStream src={espUrl} imgRef={espImgRef} alt="ESP32 Stream" />
                 )
               ) : <div className="video-placeholder">주소 입력 대기</div>}
             </div>
@@ -387,11 +386,7 @@ export default function Page() {
           <div className="video-card">
             <h3>4. 실시간 노드레드 영상 (영농일지 자동기록)</h3>
             <div className="video-container">
-              <img 
-                src={LATEST_IMG_URL} 
-                alt="Latest Stream" 
-                referrerPolicy="no-referrer"
-              />
+              <VideoStream src={LATEST_IMG_URL} alt="Latest Stream" />
             </div>
             <div className="ai-vision-panel">
               <p style={{ fontSize: '13px', color: '#94a3b8', textAlign: 'center', margin: '8px 0' }}>
@@ -417,7 +412,7 @@ export default function Page() {
                 getYoutubeId(ytUrl) ? (
                   <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${getYoutubeId(ytUrl)}?autoplay=1`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                 ) : (
-                  <img src={ytUrl} alt="Stream" referrerPolicy="no-referrer" />
+                  <VideoStream src={ytUrl} alt="Stream" />
                 )
               ) : (
                 <div className="video-placeholder">링크 입력 대기</div>
@@ -604,6 +599,24 @@ export default function Page() {
     </div>
   );
 }
+
+/* ================= VIDEO STREAM COMPONENT ================= */
+/**
+ * 센서 데이터가 업데이트(MQTT)될 때마다 전체 페이지가 리렌더링되는데,
+ * img 태그가 리렌더링되면 스트림 연결이 끊기는 것을 방지하기 위해 memo를 사용합니다.
+ */
+const VideoStream = memo(({ src, imgRef, alt }: { src: string; imgRef?: React.RefObject<HTMLImageElement>; alt: string }) => {
+  return (
+    <img 
+      ref={imgRef} 
+      src={src} 
+      alt={alt} 
+      referrerPolicy="no-referrer" 
+      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+    />
+  );
+});
+VideoStream.displayName = 'VideoStream';
 
 function Clock() {
   const [time, setTime] = useState<string>('');
