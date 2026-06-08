@@ -143,7 +143,7 @@ void setup() {
     pinMode(LED_PIN, OUTPUT);
     pinMode(HEATER_PIN, OUTPUT);
     
-    // 초기 상태: ON
+    // 초기 상태 설정
     fanState = true;
     pumpState = true;
     ledState = true;
