@@ -51,7 +51,7 @@ const LATEST_IMG_URL = `http://${RASPI_IP}:41880/stream`;
 /* ================= HELPERS ================= */
 const normalize = (msg: any): Sensor => ({
   temp: msg?.values?.temp ?? msg?.temp ?? msg?.values?.temperature ?? msg?.temperature ?? 0,
-  hum: msg?.values?.hum ?? msg?.hum ?? msg?.values?.humidity ?? msg?.humidity ?? 0,
+  hum: msg?.values?.hum ?? msg?.hum ?? msg?.humi ?? msg?.values?.humidity ?? msg?.humidity ?? 0,
   ec: msg?.values?.ec ?? msg?.ec ?? 0,
   ph: msg?.values?.ph ?? msg?.ph ?? 0,
   ppfd: msg?.values?.ppfd ?? msg?.ppfd ?? 0,
@@ -73,10 +73,10 @@ export default function Page() {
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [raspiUrl, setRaspiUrl] = useState<string>('');
   const [raspiInput, setRaspiInput] = useState<string>('');
-  const [espUrl, setEspUrl] = useState<string>('https://www.youtube.com/shorts/kB0nYgNU_ZI');
-  const [espInput, setEspInput] = useState<string>('https://youtu.be/nmFpUDosSPc');
-  const [ytUrl, setYtUrl] = useState<string>('https://www.youtube.com/watch?v=gLGqC7KMLgc&t=111s'); // 24시간 스트리밍 URL (필요시 본인의 CCTV 라이브 링크로 변경)
-  const [ytInput, setYtInput] = useState<string>('https://www.youtube.com/watch?v=tUhGh0RDis4');
+  const [espUrl, setEspUrl] = useState<string>('');
+  const [espInput, setEspInput] = useState<string>('');
+  const [ytUrl, setYtUrl] = useState<string>(''); 
+  const [ytInput, setYtInput] = useState<string>('');
   
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<string | null>(null);
