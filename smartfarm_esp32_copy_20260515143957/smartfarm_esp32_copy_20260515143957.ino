@@ -119,14 +119,19 @@ void connectWiFi() {
 
 void connectMQTT() {
     if (mqttClient.connected()) return;
-    Serial.println("Connecting to HiveMQ...");
+    Serial.print("Attempting to connect to HiveMQ Cloud... ");
     mqttClient.setUsernamePassword(mqtt_user, mqtt_pass);
+    
+    // HiveMQ Cloud 연결 안정성을 위해 KeepAlive 설정 (60초)
+    mqttClient.setKeepAliveInterval(60000);
+
     if (!mqttClient.connect(mqtt_server, mqtt_port)) {
-        Serial.print("MQTT Connection failed! Error: ");
+        Serial.print("Failed! Error code: ");
         Serial.println(mqttClient.connectError());
+        delay(2000); // 실패 시 잠시 대기
         return;
     }
-    Serial.println("MQTT Connected to HiveMQ Cloud!");
+    Serial.println("Success! Connected.");
     mqttClient.subscribe(topic_sub);
 }
 
@@ -143,7 +148,7 @@ void setup() {
     pinMode(LED_PIN, OUTPUT);
     pinMode(HEATER_PIN, OUTPUT);
     
-    // 초기 상태 설정
+    // 초기 상태: ON
     fanState = true;
     pumpState = true;
     ledState = true;
@@ -208,17 +213,16 @@ void loop() {
         float h = dht.readHumidity();
         float t = dht.readTemperature();
 
-        // 시리얼 출력
+        // 시리얼 출력 (디버깅용)
         Serial.print("Temp: "); Serial.print(t);
         Serial.print("C, Humi: "); Serial.print(h); Serial.println("%");
 
-        // MQTT 전송 (주기에 따라)
-        if (currentMs - lastMqttMs >= MQTT_PERIOD_MS && !isnan(t)) {
+        // 데이터가 유효할 때만 전송하여 웹 대시보드 에러 방지
+        // 데이터가 유효할 때만 전송하여 웹 대시보드 JSON 파싱 에러 방지
+        if (currentMs - lastMqttMs >= MQTT_PERIOD_MS && !isnan(t) && !isnan(h)) {
+            String payload = "{\"temp\":" + String(t, 1) + ",\"humi\":" + String(h, 1) + ",\"fan\":" + String(fanState ? 1 : 0) + "}";
             mqttClient.beginMessage(topic_pub);
-            mqttClient.print("{\"temp\":"); mqttClient.print(t);
-            mqttClient.print(",\"humi\":"); mqttClient.print(h);
-            mqttClient.print(",\"fan\":"); mqttClient.print(fanState ? 1 : 0);
-            mqttClient.print("}");
+            mqttClient.print(payload);
             mqttClient.endMessage();
             lastMqttMs = currentMs;
         }
